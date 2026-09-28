@@ -30,13 +30,16 @@ class CsAccountAdapter extends TypeAdapter<CsAccount> {
       totalMissed: fields[10] as int,
       currentStreak: fields[11] as int,
       bestStreak: fields[12] as int,
+      // Añadido después del primer release: cuentas guardadas antes de
+      // esto no tienen esta key, así que caen a null (sin SteamID64).
+      steamId64: fields[13] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, CsAccount obj) {
     writer
-      ..writeByte(13)
+      ..writeByte(14)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -62,7 +65,9 @@ class CsAccountAdapter extends TypeAdapter<CsAccount> {
       ..writeByte(11)
       ..write(obj.currentStreak)
       ..writeByte(12)
-      ..write(obj.bestStreak);
+      ..write(obj.bestStreak)
+      ..writeByte(13)
+      ..write(obj.steamId64);
   }
 
   @override

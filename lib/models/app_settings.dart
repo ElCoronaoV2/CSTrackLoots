@@ -36,10 +36,6 @@ class AppSettings extends HiveObject {
   @HiveField(7)
   String? steamApiKey;
 
-  /// SteamID64 del usuario, para consultar sus estadísticas de CS2.
-  @HiveField(8)
-  String? steamId64;
-
   AppSettings({
     this.preferredCurrency = 'EUR',
     this.notificationsEnabled = true,
@@ -49,12 +45,11 @@ class AppSettings extends HiveObject {
     this.autoBackupIntervalDays = 7,
     this.lastAutoBackupEpochMs = 0,
     this.steamApiKey,
-    this.steamId64,
   });
 
   /// Copia el estado cambiando solo los campos indicados. Para borrar
-  /// steamApiKey/steamId64 usa [clearSteamCredentials] en vez de esto:
-  /// aquí un valor null en esos dos campos significa "no tocar".
+  /// steamApiKey usa [clearSteamApiKey] en vez de esto: aquí un valor
+  /// null en ese campo significa "no tocar".
   AppSettings copyWith({
     String? preferredCurrency,
     bool? notificationsEnabled,
@@ -64,7 +59,6 @@ class AppSettings extends HiveObject {
     int? autoBackupIntervalDays,
     int? lastAutoBackupEpochMs,
     String? steamApiKey,
-    String? steamId64,
   }) {
     return AppSettings(
       preferredCurrency: preferredCurrency ?? this.preferredCurrency,
@@ -79,13 +73,12 @@ class AppSettings extends HiveObject {
       lastAutoBackupEpochMs:
           lastAutoBackupEpochMs ?? this.lastAutoBackupEpochMs,
       steamApiKey: steamApiKey ?? this.steamApiKey,
-      steamId64: steamId64 ?? this.steamId64,
     );
   }
 
-  /// Copia el estado quitando la key/SteamID guardadas (a diferencia de
-  /// [copyWith], aquí sí se pueden poner a null explícitamente).
-  AppSettings clearSteamCredentials() {
+  /// Copia el estado quitando la API key guardada (a diferencia de
+  /// [copyWith], aquí sí se puede poner a null explícitamente).
+  AppSettings clearSteamApiKey() {
     return AppSettings(
       preferredCurrency: preferredCurrency,
       notificationsEnabled: notificationsEnabled,
