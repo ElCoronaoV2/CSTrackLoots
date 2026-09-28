@@ -36,6 +36,61 @@ extension ItemCategoryX on ItemCategory {
         return 'Otro';
     }
   }
+
+  /// Solo armas, cuchillos y guantes tienen float/wear/StatTrak/stickers.
+  bool get supportsWearDetails =>
+      this == ItemCategory.skin ||
+      this == ItemCategory.knife ||
+      this == ItemCategory.glove;
+}
+
+/// Desgaste (wear) de una skin. Los rangos de float exactos varían por skin
+/// (cada una define su propio float mínimo/máximo), así que esto es una
+/// elección manual del usuario y no se deriva automáticamente del float.
+@HiveType(typeId: 8)
+enum SkinWear {
+  @HiveField(0)
+  factoryNew,
+  @HiveField(1)
+  minimalWear,
+  @HiveField(2)
+  fieldTested,
+  @HiveField(3)
+  wellWorn,
+  @HiveField(4)
+  battleScarred,
+}
+
+extension SkinWearX on SkinWear {
+  String get label {
+    switch (this) {
+      case SkinWear.factoryNew:
+        return 'Factory New';
+      case SkinWear.minimalWear:
+        return 'Minimal Wear';
+      case SkinWear.fieldTested:
+        return 'Field-Tested';
+      case SkinWear.wellWorn:
+        return 'Well-Worn';
+      case SkinWear.battleScarred:
+        return 'Battle-Scarred';
+    }
+  }
+
+  String get shortLabel {
+    switch (this) {
+      case SkinWear.factoryNew:
+        return 'FN';
+      case SkinWear.minimalWear:
+        return 'MW';
+      case SkinWear.fieldTested:
+        return 'FT';
+      case SkinWear.wellWorn:
+        return 'WW';
+      case SkinWear.battleScarred:
+        return 'BS';
+    }
+  }
 }
 
 /// Item individual en el Inventario General.
@@ -77,6 +132,38 @@ class InventoryItem extends HiveObject {
   @HiveField(10)
   int quantity;
 
+  /// Float (desgaste numérico 0.0-1.0) de la skin, si se conoce.
+  @HiveField(11)
+  double? floatValue;
+
+  /// Tier de desgaste (Factory New..Battle-Scarred), elegido manualmente.
+  @HiveField(12)
+  SkinWear? wear;
+
+  /// True si es la versión StatTrak™ del item.
+  @HiveField(13)
+  bool statTrak;
+
+  /// Nombres de los stickers aplicados (hasta 4 en un arma). Texto libre.
+  @HiveField(14)
+  List<String> stickers;
+
+  /// Umbral de precio para la alerta (en la moneda [alertCurrency]).
+  /// Null = sin alerta configurada para este item.
+  @HiveField(15)
+  double? alertThreshold;
+
+  /// Moneda del umbral ('EUR' o 'USD'). Solo relevante si [alertThreshold]
+  /// no es null.
+  @HiveField(16)
+  String? alertCurrency;
+
+  /// True si ya se notificó para el umbral actual (evita repetir la
+  /// notificación en cada refresco de precio). Se resetea a false si el
+  /// precio vuelve a bajar del umbral, permitiendo re-alertar más tarde.
+  @HiveField(17)
+  bool alerted;
+
   InventoryItem({
     required this.id,
     required this.accountId,
@@ -89,7 +176,17 @@ class InventoryItem extends HiveObject {
     this.sold = false,
     this.soldAt,
     this.quantity = 1,
+    this.floatValue,
+    this.wear,
+    this.statTrak = false,
+    List<String>? stickers,
+    this.alertThreshold,
+    this.alertCurrency,
+    this.alerted = false,
   })  : assert(quantity >= 0, 'quantity no puede ser negativa'),
+        assert(floatValue == null || (floatValue >= 0.0 && floatValue <= 1.0),
+            'floatValue debe estar entre 0.0 y 1.0'),
+        stickers = stickers ?? <String>[],
         obtainedAt = obtainedAt ?? DateTime.now();
 
   /// Precio EUR multiplicado por la cantidad disponible (lo que se vende).
@@ -98,4 +195,6 @@ class InventoryItem extends HiveObject {
 
   /// Cantidad aún sin vender.
   int get availableQuantity => sold ? 0 : quantity;
+
+  bool get supportsWearDetails => category.supportsWearDetails;
 }

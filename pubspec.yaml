@@ -35,6 +35,9 @@ dependencies:
   package_info_plus: ^10.2.1
   open_file: ^4.0.0
 
+  # Gráficas del dashboard de estadísticas
+  fl_chart: ^1.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

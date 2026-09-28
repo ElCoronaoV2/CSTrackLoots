@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/accounts_provider.dart';
 import '../../providers/services_providers.dart';
+import '../../services/backup_service.dart';
+import '../../services/stats_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/account_card.dart';
 import '../../widgets/background_pattern.dart';
@@ -14,6 +16,7 @@ import '../account/account_detail_screen.dart';
 import '../drop/register_drop_dialog.dart';
 import '../inventory/inventory_screen.dart';
 import '../settings/settings_screen.dart';
+import '../stats/stats_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -32,6 +35,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (!mounted) return;
       // Si el orquestador marcó un reset, pedir también refresh del estado.
       ref.read(accountsProvider.notifier);
+
+      try {
+        await StatsService.recordDailySnapshotIfNeeded();
+      } catch (_) {}
+
+      try {
+        await BackupService().autoBackupIfNeeded();
+      } catch (_) {}
 
       final update = await ref.read(updateServiceProvider).checkForUpdate();
       if (update != null && mounted) {
@@ -89,6 +100,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bar_chart, size: 22),
+            tooltip: 'Estadísticas',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const StatsScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.inventory_2_outlined, size: 22),
             tooltip: 'Inventario General',

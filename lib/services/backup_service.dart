@@ -45,6 +45,13 @@ class BackupService {
           'sold': i.sold,
           'soldAt': i.soldAt?.toIso8601String(),
           'quantity': i.quantity,
+          'floatValue': i.floatValue,
+          'wear': i.wear?.name,
+          'statTrak': i.statTrak,
+          'stickers': i.stickers,
+          'alertThreshold': i.alertThreshold,
+          'alertCurrency': i.alertCurrency,
+          'alerted': i.alerted,
         }).toList();
 
     final sales = HiveService.salesBox.values.map((s) => {
@@ -90,6 +97,58 @@ class BackupService {
       text: 'Backup de mi CS2 Tracker',
     );
     return path;
+  }
+
+  /// Backup automático silencioso: guarda un JSON en una carpeta propia de
+  /// la app en el almacenamiento del dispositivo (visible con un gestor de
+  /// archivos en Android/data/<paquete>/files/backups), sin compartir ni
+  /// pedir permisos adicionales. Respeta el intervalo configurado en
+  /// Ajustes y conserva solo los últimos 10 backups automáticos.
+  ///
+  /// No hace nada si el auto-backup está desactivado, todavía no toca el
+  /// intervalo, o el almacenamiento externo no está disponible.
+  Future<void> autoBackupIfNeeded() async {
+    final settings = HiveService.settings;
+    if (!settings.autoBackupEnabled) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final intervalMs =
+        settings.autoBackupIntervalDays * Duration.millisecondsPerDay;
+    if (now - settings.lastAutoBackupEpochMs < intervalMs) return;
+
+    final root = await getExternalStorageDirectory();
+    if (root == null) return;
+
+    final backupsDir = Directory('${root.path}/backups');
+    await backupsDir.create(recursive: true);
+
+    final ts = DateTime.now()
+        .toIso8601String()
+        .replaceAll(':', '-')
+        .split('.')
+        .first;
+    final path = '${backupsDir.path}/cs2_tracker_backup_$ts.json';
+    await File(path).writeAsString(
+      const JsonEncoder.withIndent('  ').convert(buildBackupJson()),
+    );
+
+    // Limpieza: conservar solo los últimos 10 backups automáticos.
+    final files = backupsDir
+        .listSync()
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.json'))
+        .toList()
+      ..sort((a, b) => b.path.compareTo(a.path));
+    for (final f in files.skip(10)) {
+      try {
+        await f.delete();
+      } catch (_) {}
+    }
+
+    settings.lastAutoBackupEpochMs = now;
+    try {
+      await settings.save();
+    } catch (_) {}
   }
 
   /// Restaura desde un JSON. Devuelve estadísticas (cuentas, items, ventas).
@@ -160,6 +219,13 @@ class BackupService {
         (c) => c.name == catName,
         orElse: () => ItemCategory.other,
       );
+      final wearName = m['wear'] as String?;
+      final wear = wearName == null
+          ? null
+          : SkinWear.values.firstWhere(
+              (w) => w.name == wearName,
+              orElse: () => SkinWear.factoryNew,
+            );
       final item = InventoryItem(
         id: m['id'] as String,
         accountId: m['accountId'] as String,
@@ -174,6 +240,13 @@ class BackupService {
             ? null
             : DateTime.parse(m['soldAt'] as String),
         quantity: m['quantity'] as int? ?? 1,
+        floatValue: (m['floatValue'] as num?)?.toDouble(),
+        wear: wear,
+        statTrak: m['statTrak'] as bool? ?? false,
+        stickers: (m['stickers'] as List?)?.cast<String>() ?? const [],
+        alertThreshold: (m['alertThreshold'] as num?)?.toDouble(),
+        alertCurrency: m['alertCurrency'] as String?,
+        alerted: m['alerted'] as bool? ?? false,
       );
       await HiveService.inventoryBox.put(item.id, item);
     }

@@ -142,6 +142,35 @@ class NotificationService {
     }
   }
 
+  /// Notificación inmediata cuando un item del inventario cruza el umbral
+  /// de alerta de precio que el usuario configuró. Usa un id derivado del
+  /// itemId para que alertas de items distintos no se sobrescriban entre sí.
+  Future<void> showPriceAlert({
+    required String itemId,
+    required String itemName,
+    required double price,
+    required String currency,
+  }) async {
+    await init();
+    final symbol = currency == 'USD' ? r'$' : '€';
+    final id = 2000 + (itemId.hashCode.abs() % 5000);
+    await _plugin.show(
+      id,
+      'Alerta de precio',
+      '$itemName alcanzó $symbol${price.toStringAsFixed(2)}',
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'cs2_drops', 'CS2 Drops',
+          channelDescription: 'Recordatorios del drop semanal y nuevo ciclo de CS2',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(),
+        macOS: DarwinNotificationDetails(),
+      ),
+    );
+  }
+
   /// Notificación inmediata (test de diagnóstico desde Settings).
   Future<void> showTestNotification() async {
     await init();

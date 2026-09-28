@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../providers/accounts_provider.dart';
 import '../../providers/services_providers.dart';
@@ -122,6 +123,19 @@ class SettingsScreen extends ConsumerWidget {
                       'Restaura un backup previo. SOBRESCRIBE los datos actuales.'),
                   onTap: () => _importBackup(context, ref),
                 ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Backup automático'),
+                  subtitle: Text(
+                    settings.autoBackupEnabled
+                        ? 'Cada ${settings.autoBackupIntervalDays} días, en una carpeta del dispositivo. ${_lastBackupLabel(settings.lastAutoBackupEpochMs)}'
+                        : 'Desactivado. Guarda un JSON periódicamente sin necesidad de exportar a mano.',
+                  ),
+                  value: settings.autoBackupEnabled,
+                  onChanged: (v) => ref
+                      .read(settingsProvider.notifier)
+                      .setAutoBackupEnabled(v),
+                ),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.history),
@@ -218,6 +232,12 @@ class _Section extends StatelessWidget {
       ),
     );
   }
+}
+
+String _lastBackupLabel(int epochMs) {
+  if (epochMs <= 0) return 'Todavía no se ha hecho ninguno.';
+  final date = DateTime.fromMillisecondsSinceEpoch(epochMs);
+  return 'Último: ${DateFormat('dd/MM/yyyy HH:mm').format(date)}.';
 }
 
 Future<void> _exportBackup(BuildContext context) async {

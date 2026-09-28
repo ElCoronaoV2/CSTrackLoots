@@ -5,7 +5,9 @@ import 'package:intl/intl.dart';
 
 import '../models/inventory_item.dart';
 import '../providers/inventory_provider.dart';
+import '../providers/services_providers.dart';
 import '../services/hive_service.dart';
+import '../services/skinport_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/formatters.dart';
 import 'item_icons.dart';
@@ -66,6 +68,25 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
               children: [
                 Row(
                   children: [
+                    if (item.statTrak) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppTheme.csOrange,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'ST™',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
                     Flexible(
                       child: Text(
                         item.itemName,
@@ -122,6 +143,25 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
                       icon: Icons.event_outlined,
                       text: dateStr,
                     ),
+                    if (item.wear != null)
+                      _MiniChip(
+                        icon: Icons.blur_circular,
+                        text: item.floatValue != null
+                            ? '${item.wear!.shortLabel} ${item.floatValue!.toStringAsFixed(4)}'
+                            : item.wear!.shortLabel,
+                      ),
+                    if (item.wear == null && item.floatValue != null)
+                      _MiniChip(
+                        icon: Icons.blur_circular,
+                        text: item.floatValue!.toStringAsFixed(4),
+                      ),
+                    if (item.stickers.isNotEmpty)
+                      _MiniChip(
+                        icon: Icons.emoji_emotions_outlined,
+                        text: item.stickers.length == 1
+                            ? item.stickers.first
+                            : '${item.stickers.length} stickers',
+                      ),
                   ],
                 ),
               ],
@@ -153,6 +193,16 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  IconButton(
+                    tooltip: 'Comparar con Skinport',
+                    onPressed: () => _comparePrices(context),
+                    icon: const Icon(Icons.compare_arrows,
+                        size: 18, color: Colors.white54),
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints(minWidth: 32, minHeight: 32),
+                    visualDensity: VisualDensity.compact,
+                  ),
                   TextButton.icon(
                     onPressed: () => _confirmSell(context),
                     style: TextButton.styleFrom(
@@ -175,6 +225,26 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
                       ),
                     ),
                   ),
+                  if (!item.sold)
+                    IconButton(
+                      tooltip: item.alertThreshold != null
+                          ? 'Alerta de precio activa'
+                          : 'Poner alerta de precio',
+                      onPressed: () => _setAlert(context),
+                      icon: Icon(
+                        item.alertThreshold != null
+                            ? Icons.notifications_active
+                            : Icons.notifications_none,
+                        size: 18,
+                        color: item.alertThreshold != null
+                            ? AppTheme.csOrange
+                            : Colors.white54,
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints:
+                          const BoxConstraints(minWidth: 32, minHeight: 32),
+                      visualDensity: VisualDensity.compact,
+                    ),
                   IconButton(
                     tooltip: 'Eliminar del inventario',
                     onPressed: () => _confirmDelete(context),
@@ -332,6 +402,174 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
       );
       widget.onDelete();
     }
+  }
+
+  Future<void> _comparePrices(BuildContext context) async {
+    final item = widget.item;
+    final steamPrice =
+        widget.currency == 'USD' ? item.priceUsd : item.priceEur;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: const [
+            Icon(Icons.compare_arrows, color: Color(0xFFF59E0B)),
+            SizedBox(width: 8),
+            Expanded(child: Text('Comparar precios')),
+          ],
+        ),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.itemName,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 14),
+              _PriceRow(
+                label: 'Steam Community Market',
+                value: formatPrice(steamPrice, widget.currency),
+              ),
+              const Divider(height: 24, color: Color(0xFF2A313B)),
+              FutureBuilder<SkinportPrice?>(
+                future: ref
+                    .read(skinportServiceProvider)
+                    .getPrice(item.itemName, currency: widget.currency),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child:
+                              CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    );
+                  }
+                  final price = snapshot.data;
+                  if (price == null) {
+                    return const Text(
+                      'Skinport no disponible ahora mismo (a veces bloquea peticiones automatizadas). El precio de Steam de arriba sigue siendo correcto.',
+                      style: TextStyle(color: Colors.white54, fontSize: 12),
+                    );
+                  }
+                  return _PriceRow(
+                    label: 'Skinport (mínimo)',
+                    value: formatPrice(price.minPrice, widget.currency),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _setAlert(BuildContext context) async {
+    final item = widget.item;
+    final current =
+        item.alertCurrency == widget.currency ? item.alertThreshold : null;
+    final ctrl = TextEditingController(
+      text: current != null ? current.toStringAsFixed(2) : '',
+    );
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: const [
+            Icon(Icons.notifications_active_outlined, color: Color(0xFFF59E0B)),
+            SizedBox(width: 8),
+            Expanded(child: Text('Alerta de precio')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Te avisamos con una notificación cuando "${item.itemName}" alcance este precio o más. Déjalo vacío para quitar la alerta.',
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'Precio (${widget.currency})',
+                prefixIcon: Icon(
+                  widget.currency == 'USD' ? Icons.attach_money : Icons.euro,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+    final text = ctrl.text;
+    ctrl.dispose();
+    if (confirmed != true || !mounted) return;
+
+    final trimmed = text.trim().replaceAll(',', '.');
+    final value = trimmed.isEmpty ? null : double.tryParse(trimmed);
+    await ref.read(inventoryProvider.notifier).setAlertThreshold(
+          item.id,
+          currency: widget.currency,
+          threshold: value,
+        );
+  }
+}
+
+/// Fila etiqueta + precio para el diálogo de comparación de precios.
+class _PriceRow extends StatelessWidget {
+  const _PriceRow({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(color: Colors.white70, fontSize: 13),
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 15,
+          ),
+        ),
+      ],
+    );
   }
 }
 

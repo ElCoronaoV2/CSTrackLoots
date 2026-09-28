@@ -65,7 +65,16 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
   /// Busca un item sin vender con el mismo nombre (case-insensitive) en la
   /// misma cuenta, para apilar cantidades en vez de crear filas duplicadas
   /// (p.ej. 3 "Kilowatt Case" ya en inventario + 1 nuevo del drop = 1 fila x4).
-  InventoryItem? _findStackable({required String name, required String accountId}) {
+  ///
+  /// Las skins/cuchillos/guantes NUNCA se apilan aunque compartan nombre:
+  /// cada uno es un item físicamente distinto (float, patrón, stickers
+  /// propios), así que agruparlos perdería esa información.
+  InventoryItem? _findStackable({
+    required String name,
+    required String accountId,
+    required ItemCategory category,
+  }) {
+    if (category.supportsWearDetails) return null;
     final lower = name.toLowerCase();
     for (final item in HiveService.inventoryBox.values) {
       if (item.sold) continue;
@@ -96,7 +105,16 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
   /// dispara la consulta de precios + icono en background.
   Future<void> registerDrop({
     required CsAccount account,
-    required List<({String itemName, ItemCategory category, int quantity})> items,
+    required List<
+        ({
+          String itemName,
+          ItemCategory category,
+          int quantity,
+          double? floatValue,
+          SkinWear? wear,
+          bool statTrak,
+          List<String> stickers,
+        })> items,
     required DateTime when,
   }) async {
     final entries = <InventoryItem>[];
@@ -104,7 +122,8 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
       final name = it.itemName.trim();
       if (name.isEmpty) continue;
       final qty = it.quantity <= 0 ? 1 : it.quantity;
-      final existing = _findStackable(name: name, accountId: account.id);
+      final existing =
+          _findStackable(name: name, accountId: account.id, category: it.category);
       if (existing != null) {
         entries.add(await _stackOnto(existing, qty: qty, when: when));
         continue;
@@ -117,6 +136,10 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
         category: it.category,
         quantity: qty,
         obtainedAt: when,
+        floatValue: it.floatValue,
+        wear: it.wear,
+        statTrak: it.statTrak,
+        stickers: it.stickers,
       );
       await HiveService.inventoryBox.put(entry.id, entry);
       entries.add(entry);
@@ -140,12 +163,17 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
     required DateTime obtainedAt,
     CsAccount? account,
     int quantity = 1,
+    double? floatValue,
+    SkinWear? wear,
+    bool statTrak = false,
+    List<String> stickers = const [],
   }) async {
     final name = itemName.trim();
     final qty = quantity <= 0 ? 1 : quantity;
     final accountId = account?.id ?? '__manual__';
 
-    final existing = _findStackable(name: name, accountId: accountId);
+    final existing =
+        _findStackable(name: name, accountId: accountId, category: category);
     if (existing != null) {
       final stacked = await _stackOnto(existing, qty: qty, when: obtainedAt);
       _load();
@@ -161,12 +189,68 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
       category: category,
       quantity: qty,
       obtainedAt: obtainedAt,
+      floatValue: floatValue,
+      wear: wear,
+      statTrak: statTrak,
+      stickers: stickers,
     );
     await HiveService.inventoryBox.put(entry.id, entry);
     _load();
 
     _enrichItems(<InventoryItem>[entry]);
     return entry;
+  }
+
+  /// Fija (o quita, con `threshold: null`) el umbral de alerta de precio
+  /// de un item, en la moneda indicada. Resetea `alerted` para que un
+  /// umbral nuevo (o el mismo tras haber bajado el precio) pueda volver a
+  /// disparar la notificación.
+  Future<void> setAlertThreshold(
+    String itemId, {
+    required String currency,
+    required double? threshold,
+  }) async {
+    final item = HiveService.inventoryBox.get(itemId);
+    if (item == null) return;
+    item.alertThreshold = threshold;
+    item.alertCurrency = currency;
+    item.alerted = false;
+    try {
+      await item.save();
+    } catch (_) {}
+    _load();
+  }
+
+  /// Comprueba si el precio actual de `item` cruza su umbral de alerta y,
+  /// si es así (y no se había notificado ya), dispara una notificación
+  /// local. Si el precio vuelve a bajar del umbral, resetea `alerted` para
+  /// permitir re-alertar en una subida futura.
+  Future<void> _checkPriceAlert(InventoryItem item) async {
+    final threshold = item.alertThreshold;
+    if (threshold == null) return;
+    final currency = item.alertCurrency ?? 'EUR';
+    final price = currency == 'USD' ? item.priceUsd : item.priceEur;
+    if (price >= threshold) {
+      if (!item.alerted) {
+        item.alerted = true;
+        try {
+          await item.save();
+        } catch (_) {}
+        try {
+          await ref.read(notificationServiceProvider).showPriceAlert(
+                itemId: item.id,
+                itemName: item.itemName,
+                price: price,
+                currency: currency,
+              );
+        } catch (_) {}
+      }
+    } else if (item.alerted) {
+      item.alerted = false;
+      try {
+        await item.save();
+      } catch (_) {}
+    }
   }
 
   /// Lanza en background las llamadas de precio (EUR+USD) e icono.
@@ -186,6 +270,7 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
               try {
                 await e.save();
               } catch (_) {/* item borrado entre tanto */}
+              await _checkPriceAlert(e);
               _load();
             }
           })
@@ -294,6 +379,7 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
           try {
             await item.save();
           } catch (_) {}
+          await _checkPriceAlert(item);
         }
         await market.getIconUrl(item.itemName, forceRefresh: force, silent: true);
       } catch (_) {/* silencio */}
@@ -316,6 +402,7 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
         try {
           await item.save();
         } catch (_) {}
+        await _checkPriceAlert(item);
       }
       await market.getIconUrl(item.itemName, forceRefresh: force, silent: true);
     } catch (_) {}

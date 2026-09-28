@@ -21,13 +21,18 @@ class AppSettingsAdapter extends TypeAdapter<AppSettings> {
       notificationsEnabled: fields[1] as bool,
       remind24hBeforeReset: fields[2] as bool,
       lastProcessedResetEpochMs: fields[3] as int,
+      // Añadidos después del primer release: registros guardados antes de
+      // esto no tienen estas keys, así que caen a sus valores por defecto.
+      autoBackupEnabled: fields[4] as bool? ?? true,
+      autoBackupIntervalDays: fields[5] as int? ?? 7,
+      lastAutoBackupEpochMs: fields[6] as int? ?? 0,
     );
   }
 
   @override
   void write(BinaryWriter writer, AppSettings obj) {
     writer
-      ..writeByte(4)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.preferredCurrency)
       ..writeByte(1)
@@ -35,7 +40,13 @@ class AppSettingsAdapter extends TypeAdapter<AppSettings> {
       ..writeByte(2)
       ..write(obj.remind24hBeforeReset)
       ..writeByte(3)
-      ..write(obj.lastProcessedResetEpochMs);
+      ..write(obj.lastProcessedResetEpochMs)
+      ..writeByte(4)
+      ..write(obj.autoBackupEnabled)
+      ..writeByte(5)
+      ..write(obj.autoBackupIntervalDays)
+      ..writeByte(6)
+      ..write(obj.lastAutoBackupEpochMs);
   }
 
   @override
