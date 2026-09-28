@@ -89,7 +89,7 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                 optionsBuilder: (TextEditingValue value) {
                   if (value.text.isEmpty) return const Iterable<String>.empty();
                   final q = value.text.toLowerCase();
-                  return SeedItems.all
+                  return SeedItems.forCategory(_category)
                       .where((s) => s.toLowerCase().contains(q))
                       .take(8);
                 },
