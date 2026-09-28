@@ -26,13 +26,15 @@ class AppSettingsAdapter extends TypeAdapter<AppSettings> {
       autoBackupEnabled: fields[4] as bool? ?? true,
       autoBackupIntervalDays: fields[5] as int? ?? 7,
       lastAutoBackupEpochMs: fields[6] as int? ?? 0,
+      steamApiKey: fields[7] as String?,
+      steamId64: fields[8] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, AppSettings obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.preferredCurrency)
       ..writeByte(1)
@@ -46,7 +48,11 @@ class AppSettingsAdapter extends TypeAdapter<AppSettings> {
       ..writeByte(5)
       ..write(obj.autoBackupIntervalDays)
       ..writeByte(6)
-      ..write(obj.lastAutoBackupEpochMs);
+      ..write(obj.lastAutoBackupEpochMs)
+      ..writeByte(7)
+      ..write(obj.steamApiKey)
+      ..writeByte(8)
+      ..write(obj.steamId64);
   }
 
   @override

@@ -24,6 +24,17 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
 
   Future<void> setAutoBackupEnabled(bool enabled) =>
       _update((s) => s.copyWith(autoBackupEnabled: enabled));
+
+  /// Guarda la Steam Web API key + SteamID64 del usuario. Se persisten
+  /// solo en este dispositivo (Hive local), nunca en el repositorio.
+  Future<void> setSteamCredentials({
+    required String apiKey,
+    required String steamId64,
+  }) =>
+      _update((s) => s.copyWith(steamApiKey: apiKey, steamId64: steamId64));
+
+  Future<void> clearSteamCredentials() =>
+      _update((s) => s.clearSteamCredentials());
 }
 
 final settingsProvider = StateNotifierProvider<SettingsNotifier, AppSettings>(

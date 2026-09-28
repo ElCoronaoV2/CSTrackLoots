@@ -4,6 +4,7 @@ import '../services/drop_cycle_orchestrator.dart';
 import '../services/notification_service.dart';
 import '../services/skinport_service.dart';
 import '../services/steam_market_service.dart';
+import '../services/steam_stats_service.dart';
 import '../services/update_service.dart';
 import '../services/weekly_reset_service.dart';
 
@@ -31,6 +32,10 @@ final steamMarketServiceProvider = Provider<SteamMarketService>((ref) {
 
 final skinportServiceProvider = Provider<SkinportService>((ref) {
   return SkinportService();
+});
+
+final steamStatsServiceProvider = Provider<SteamStatsService>((ref) {
+  return SteamStatsService();
 });
 
 final updateServiceProvider = Provider<UpdateService>((ref) {
