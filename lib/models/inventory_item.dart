@@ -148,6 +148,22 @@ class InventoryItem extends HiveObject {
   @HiveField(14)
   List<String> stickers;
 
+  /// Umbral de precio para la alerta (en la moneda [alertCurrency]).
+  /// Null = sin alerta configurada para este item.
+  @HiveField(15)
+  double? alertThreshold;
+
+  /// Moneda del umbral ('EUR' o 'USD'). Solo relevante si [alertThreshold]
+  /// no es null.
+  @HiveField(16)
+  String? alertCurrency;
+
+  /// True si ya se notificó para el umbral actual (evita repetir la
+  /// notificación en cada refresco de precio). Se resetea a false si el
+  /// precio vuelve a bajar del umbral, permitiendo re-alertar más tarde.
+  @HiveField(17)
+  bool alerted;
+
   InventoryItem({
     required this.id,
     required this.accountId,
@@ -164,6 +180,9 @@ class InventoryItem extends HiveObject {
     this.wear,
     this.statTrak = false,
     List<String>? stickers,
+    this.alertThreshold,
+    this.alertCurrency,
+    this.alerted = false,
   })  : assert(quantity >= 0, 'quantity no puede ser negativa'),
         assert(floatValue == null || (floatValue >= 0.0 && floatValue <= 1.0),
             'floatValue debe estar entre 0.0 y 1.0'),

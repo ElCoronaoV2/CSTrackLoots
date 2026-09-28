@@ -49,6 +49,9 @@ class BackupService {
           'wear': i.wear?.name,
           'statTrak': i.statTrak,
           'stickers': i.stickers,
+          'alertThreshold': i.alertThreshold,
+          'alertCurrency': i.alertCurrency,
+          'alerted': i.alerted,
         }).toList();
 
     final sales = HiveService.salesBox.values.map((s) => {
@@ -189,6 +192,9 @@ class BackupService {
         wear: wear,
         statTrak: m['statTrak'] as bool? ?? false,
         stickers: (m['stickers'] as List?)?.cast<String>() ?? const [],
+        alertThreshold: (m['alertThreshold'] as num?)?.toDouble(),
+        alertCurrency: m['alertCurrency'] as String?,
+        alerted: m['alerted'] as bool? ?? false,
       );
       await HiveService.inventoryBox.put(item.id, item);
     }

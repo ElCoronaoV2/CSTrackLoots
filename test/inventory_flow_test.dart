@@ -100,6 +100,43 @@ void main() {
       expect(item.totalUsd, closeTo(0.80, 1e-9)); // 5 * 0.16
     });
 
+    test('serializa alerta de precio round-trip', () async {
+      final id = _uuid.v4();
+      final item = InventoryItem(
+        id: id,
+        accountId: 'acc1',
+        accountName: 'SmokeTest',
+        itemName: 'Kilowatt Case',
+        category: ItemCategory.caseBox,
+        obtainedAt: DateTime.now(),
+        alertThreshold: 1.5,
+        alertCurrency: 'EUR',
+        alerted: true,
+      );
+      await HiveService.inventoryBox.put(id, item);
+      final restored = HiveService.inventoryBox.get(id);
+      expect(restored!.alertThreshold, closeTo(1.5, 1e-9));
+      expect(restored.alertCurrency, 'EUR');
+      expect(restored.alerted, isTrue);
+    });
+
+    test('sin alerta configurada por defecto', () async {
+      final id = _uuid.v4();
+      final item = InventoryItem(
+        id: id,
+        accountId: 'acc1',
+        accountName: 'SmokeTest',
+        itemName: 'Kilowatt Case',
+        category: ItemCategory.caseBox,
+        obtainedAt: DateTime.now(),
+      );
+      await HiveService.inventoryBox.put(id, item);
+      final restored = HiveService.inventoryBox.get(id);
+      expect(restored!.alertThreshold, isNull);
+      expect(restored.alertCurrency, isNull);
+      expect(restored.alerted, isFalse);
+    });
+
     test('serializa float/wear/StatTrak/stickers round-trip', () async {
       final id = _uuid.v4();
       final item = InventoryItem(

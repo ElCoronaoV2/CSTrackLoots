@@ -213,6 +213,26 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
                       ),
                     ),
                   ),
+                  if (!item.sold)
+                    IconButton(
+                      tooltip: item.alertThreshold != null
+                          ? 'Alerta de precio activa'
+                          : 'Poner alerta de precio',
+                      onPressed: () => _setAlert(context),
+                      icon: Icon(
+                        item.alertThreshold != null
+                            ? Icons.notifications_active
+                            : Icons.notifications_none,
+                        size: 18,
+                        color: item.alertThreshold != null
+                            ? AppTheme.csOrange
+                            : Colors.white54,
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints:
+                          const BoxConstraints(minWidth: 32, minHeight: 32),
+                      visualDensity: VisualDensity.compact,
+                    ),
                   IconButton(
                     tooltip: 'Eliminar del inventario',
                     onPressed: () => _confirmDelete(context),
@@ -370,6 +390,70 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
       );
       widget.onDelete();
     }
+  }
+
+  Future<void> _setAlert(BuildContext context) async {
+    final item = widget.item;
+    final current =
+        item.alertCurrency == widget.currency ? item.alertThreshold : null;
+    final ctrl = TextEditingController(
+      text: current != null ? current.toStringAsFixed(2) : '',
+    );
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: const [
+            Icon(Icons.notifications_active_outlined, color: Color(0xFFF59E0B)),
+            SizedBox(width: 8),
+            Expanded(child: Text('Alerta de precio')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Te avisamos con una notificación cuando "${item.itemName}" alcance este precio o más. Déjalo vacío para quitar la alerta.',
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'Precio (${widget.currency})',
+                prefixIcon: Icon(
+                  widget.currency == 'USD' ? Icons.attach_money : Icons.euro,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+    final text = ctrl.text;
+    ctrl.dispose();
+    if (confirmed != true || !mounted) return;
+
+    final trimmed = text.trim().replaceAll(',', '.');
+    final value = trimmed.isEmpty ? null : double.tryParse(trimmed);
+    await ref.read(inventoryProvider.notifier).setAlertThreshold(
+          item.id,
+          currency: widget.currency,
+          threshold: value,
+        );
   }
 }
 

@@ -35,13 +35,16 @@ class InventoryItemAdapter extends TypeAdapter<InventoryItem> {
       wear: fields[12] as SkinWear?,
       statTrak: fields[13] as bool? ?? false,
       stickers: (fields[14] as List?)?.cast<String>(),
+      alertThreshold: fields[15] as double?,
+      alertCurrency: fields[16] as String?,
+      alerted: fields[17] as bool? ?? false,
     );
   }
 
   @override
   void write(BinaryWriter writer, InventoryItem obj) {
     writer
-      ..writeByte(15)
+      ..writeByte(18)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -71,7 +74,13 @@ class InventoryItemAdapter extends TypeAdapter<InventoryItem> {
       ..writeByte(13)
       ..write(obj.statTrak)
       ..writeByte(14)
-      ..write(obj.stickers);
+      ..write(obj.stickers)
+      ..writeByte(15)
+      ..write(obj.alertThreshold)
+      ..writeByte(16)
+      ..write(obj.alertCurrency)
+      ..writeByte(17)
+      ..write(obj.alerted);
   }
 
   @override

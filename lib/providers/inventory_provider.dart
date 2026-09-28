@@ -201,6 +201,58 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
     return entry;
   }
 
+  /// Fija (o quita, con `threshold: null`) el umbral de alerta de precio
+  /// de un item, en la moneda indicada. Resetea `alerted` para que un
+  /// umbral nuevo (o el mismo tras haber bajado el precio) pueda volver a
+  /// disparar la notificación.
+  Future<void> setAlertThreshold(
+    String itemId, {
+    required String currency,
+    required double? threshold,
+  }) async {
+    final item = HiveService.inventoryBox.get(itemId);
+    if (item == null) return;
+    item.alertThreshold = threshold;
+    item.alertCurrency = currency;
+    item.alerted = false;
+    try {
+      await item.save();
+    } catch (_) {}
+    _load();
+  }
+
+  /// Comprueba si el precio actual de `item` cruza su umbral de alerta y,
+  /// si es así (y no se había notificado ya), dispara una notificación
+  /// local. Si el precio vuelve a bajar del umbral, resetea `alerted` para
+  /// permitir re-alertar en una subida futura.
+  Future<void> _checkPriceAlert(InventoryItem item) async {
+    final threshold = item.alertThreshold;
+    if (threshold == null) return;
+    final currency = item.alertCurrency ?? 'EUR';
+    final price = currency == 'USD' ? item.priceUsd : item.priceEur;
+    if (price >= threshold) {
+      if (!item.alerted) {
+        item.alerted = true;
+        try {
+          await item.save();
+        } catch (_) {}
+        try {
+          await ref.read(notificationServiceProvider).showPriceAlert(
+                itemId: item.id,
+                itemName: item.itemName,
+                price: price,
+                currency: currency,
+              );
+        } catch (_) {}
+      }
+    } else if (item.alerted) {
+      item.alerted = false;
+      try {
+        await item.save();
+      } catch (_) {}
+    }
+  }
+
   /// Lanza en background las llamadas de precio (EUR+USD) e icono.
   /// Cada llamada actualiza su item correspondiente y dispara un _load().
   /// Protegido con try/catch y guard isInBox para no crashear si el usuario
@@ -218,6 +270,7 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
               try {
                 await e.save();
               } catch (_) {/* item borrado entre tanto */}
+              await _checkPriceAlert(e);
               _load();
             }
           })
@@ -326,6 +379,7 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
           try {
             await item.save();
           } catch (_) {}
+          await _checkPriceAlert(item);
         }
         await market.getIconUrl(item.itemName, forceRefresh: force, silent: true);
       } catch (_) {/* silencio */}
@@ -348,6 +402,7 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
         try {
           await item.save();
         } catch (_) {}
+        await _checkPriceAlert(item);
       }
       await market.getIconUrl(item.itemName, forceRefresh: force, silent: true);
     } catch (_) {}
