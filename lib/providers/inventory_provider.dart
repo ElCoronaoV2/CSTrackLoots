@@ -62,8 +62,38 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
     super.dispose();
   }
 
-  /// Inserta 1 o 2 items en el inventario, marca la cuenta como completada
-  /// y dispara la consulta de precios + icono en background.
+  /// Busca un item sin vender con el mismo nombre (case-insensitive) en la
+  /// misma cuenta, para apilar cantidades en vez de crear filas duplicadas
+  /// (p.ej. 3 "Kilowatt Case" ya en inventario + 1 nuevo del drop = 1 fila x4).
+  InventoryItem? _findStackable({required String name, required String accountId}) {
+    final lower = name.toLowerCase();
+    for (final item in HiveService.inventoryBox.values) {
+      if (item.sold) continue;
+      if (item.accountId != accountId) continue;
+      if (item.itemName.trim().toLowerCase() == lower) return item;
+    }
+    return null;
+  }
+
+  /// Apila `qty` unidades sobre un item existente (mismo precio unitario;
+  /// el total mostrado se recalcula solo con `quantity`), actualizando la
+  /// fecha a la más reciente para que el stack suba al tope del listado.
+  Future<InventoryItem> _stackOnto(
+    InventoryItem existing, {
+    required int qty,
+    required DateTime when,
+  }) async {
+    existing.quantity += qty;
+    existing.obtainedAt = when;
+    try {
+      await existing.save();
+    } catch (_) {}
+    return existing;
+  }
+
+  /// Inserta 1 o 2 items en el inventario (apilando sobre items iguales ya
+  /// existentes en la misma cuenta), marca la cuenta como completada y
+  /// dispara la consulta de precios + icono en background.
   Future<void> registerDrop({
     required CsAccount account,
     required List<({String itemName, ItemCategory category, int quantity})> items,
@@ -73,13 +103,19 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
     for (final it in items) {
       final name = it.itemName.trim();
       if (name.isEmpty) continue;
+      final qty = it.quantity <= 0 ? 1 : it.quantity;
+      final existing = _findStackable(name: name, accountId: account.id);
+      if (existing != null) {
+        entries.add(await _stackOnto(existing, qty: qty, when: when));
+        continue;
+      }
       final entry = InventoryItem(
         id: _uuid.v4(),
         accountId: account.id,
         accountName: account.alias,
         itemName: name,
         category: it.category,
-        quantity: it.quantity <= 0 ? 1 : it.quantity,
+        quantity: qty,
         obtainedAt: when,
       );
       await HiveService.inventoryBox.put(entry.id, entry);
@@ -94,7 +130,8 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
     _enrichItems(entries);
   }
 
-  /// Añade un item al inventario sin tocar el estado de drop de ninguna cuenta.
+  /// Añade un item al inventario sin tocar el estado de drop de ninguna cuenta,
+  /// apilando sobre un item igual ya existente en la misma cuenta si lo hay.
   /// Si `account` es null, se guarda con `accountName = "Manual"` y un accountId
   /// especial para que no coincida con ninguna cuenta real.
   Future<InventoryItem> addManualItem({
@@ -105,13 +142,24 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
     int quantity = 1,
   }) async {
     final name = itemName.trim();
+    final qty = quantity <= 0 ? 1 : quantity;
+    final accountId = account?.id ?? '__manual__';
+
+    final existing = _findStackable(name: name, accountId: accountId);
+    if (existing != null) {
+      final stacked = await _stackOnto(existing, qty: qty, when: obtainedAt);
+      _load();
+      _enrichItems(<InventoryItem>[stacked]);
+      return stacked;
+    }
+
     final entry = InventoryItem(
       id: _uuid.v4(),
-      accountId: account?.id ?? '__manual__',
+      accountId: accountId,
       accountName: account?.alias ?? 'Manual',
       itemName: name,
       category: category,
-      quantity: quantity <= 0 ? 1 : quantity,
+      quantity: qty,
       obtainedAt: obtainedAt,
     );
     await HiveService.inventoryBox.put(entry.id, entry);

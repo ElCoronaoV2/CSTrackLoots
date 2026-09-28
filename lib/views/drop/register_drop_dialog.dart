@@ -195,7 +195,7 @@ class _ItemRow extends StatelessWidget {
                 optionsBuilder: (TextEditingValue value) {
                   if (value.text.isEmpty) return const Iterable<String>.empty();
                   final query = value.text.toLowerCase();
-                  return SeedItems.all
+                  return SeedItems.forCategory(item.category)
                       .where((s) => s.toLowerCase().contains(query))
                       .take(8);
                 },

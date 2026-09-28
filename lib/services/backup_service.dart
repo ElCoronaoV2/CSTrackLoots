@@ -94,14 +94,15 @@ class BackupService {
 
   /// Restaura desde un JSON. Devuelve estadísticas (cuentas, items, ventas).
   Future<({int accounts, int items, int sales})> restoreFromPicker() async {
-    final result = await FilePicker.platform.pickFiles(
+    final files = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['json'],
+      allowMultiple: false,
     );
-    if (result == null || result.files.isEmpty) {
+    if (files.isEmpty) {
       throw const BackupCancelledException();
     }
-    final path = result.files.single.path;
+    final path = files.single.path;
     if (path == null) {
       throw const BackupCancelledException();
     }

@@ -1,0 +1,4 @@
+storePassword=REPLACE_ME
+keyPassword=REPLACE_ME
+keyAlias=cs2tracker
+storeFile=app/release.keystore
