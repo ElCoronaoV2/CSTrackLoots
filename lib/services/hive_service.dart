@@ -6,6 +6,7 @@ import '../models/cs_rank_enums.dart';
 import '../models/inventory_item.dart';
 import '../models/price_cache_entry.dart';
 import '../models/sale_record.dart';
+import '../models/value_snapshot.dart';
 
 /// Nombre de las cajas y collections usadas en el autocompletado del drop.
 /// Lista curada de CS2 a fecha del proyecto. El usuario puede escribir libremente.
@@ -125,6 +126,7 @@ class HiveService {
   static const String priceCacheBoxName = 'price_cache';
   static const String settingsBoxName = 'settings';
   static const String salesBoxName = 'sales';
+  static const String valueSnapshotsBoxName = 'value_snapshots';
   static const String settingsKey = 'app_settings';
 
   static Future<void> init() async {
@@ -142,12 +144,16 @@ class HiveService {
     if (!Hive.isAdapterRegistered(6)) Hive.registerAdapter(AppSettingsAdapter());
     if (!Hive.isAdapterRegistered(7)) Hive.registerAdapter(SaleRecordAdapter());
     if (!Hive.isAdapterRegistered(8)) Hive.registerAdapter(SkinWearAdapter());
+    if (!Hive.isAdapterRegistered(9)) {
+      Hive.registerAdapter(ValueSnapshotAdapter());
+    }
 
     // Apertura de boxes.
     await Hive.openBox<CsAccount>(accountsBoxName);
     await Hive.openBox<InventoryItem>(inventoryBoxName);
     await Hive.openBox<PriceCacheEntry>(priceCacheBoxName);
     await Hive.openBox<SaleRecord>(salesBoxName);
+    await Hive.openBox<ValueSnapshot>(valueSnapshotsBoxName);
     final settingsBox = await Hive.openBox<AppSettings>(settingsBoxName);
 
     if (settingsBox.get(settingsKey) == null) {
@@ -163,6 +169,8 @@ class HiveService {
   static Box<AppSettings> get settingsBox =>
       Hive.box<AppSettings>(settingsBoxName);
   static Box<SaleRecord> get salesBox => Hive.box<SaleRecord>(salesBoxName);
+  static Box<ValueSnapshot> get valueSnapshotsBox =>
+      Hive.box<ValueSnapshot>(valueSnapshotsBoxName);
 
   static AppSettings get settings => settingsBox.get(settingsKey)!;
 }
