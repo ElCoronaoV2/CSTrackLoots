@@ -40,7 +40,10 @@ class Cs2LifetimeStats {
     return Cs2LifetimeStats(
       kills: i('total_kills'),
       deaths: i('total_deaths'),
-      wins: i('total_wins'),
+      // 'total_wins' cuenta RONDAS ganadas, no partidas: con 'matchesPlayed'
+      // (partidas) el % de victorias saldría por encima del 100%. La
+      // partida ganada de verdad es 'total_matches_won'.
+      wins: i('total_matches_won'),
       matchesPlayed: i('total_matches_played'),
       mvps: i('total_mvps'),
       headshotKills: i('total_kills_headshot'),
