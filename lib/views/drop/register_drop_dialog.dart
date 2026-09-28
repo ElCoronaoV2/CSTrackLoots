@@ -5,12 +5,20 @@ import '../../models/cs_account.dart';
 import '../../models/inventory_item.dart';
 import '../../providers/inventory_provider.dart';
 import '../../services/hive_service.dart' show SeedItems;
+import '../../widgets/wear_details_fields.dart';
 
 class _DropItem {
   TextEditingController name;
   ItemCategory category;
+  TextEditingController floatCtrl;
+  TextEditingController stickersCtrl;
+  SkinWear? wear;
+  bool statTrak;
   _DropItem({String name = '', this.category = ItemCategory.caseBox})
-      : name = TextEditingController(text: name);
+      : name = TextEditingController(text: name),
+        floatCtrl = TextEditingController(),
+        stickersCtrl = TextEditingController(),
+        statTrak = false;
 }
 
 /// Diálogo modal que permite registrar 1 o 2 objetos del drop semanal de CS2.
@@ -39,6 +47,8 @@ class _RegisterDropDialogState extends ConsumerState<RegisterDropDialog> {
   void dispose() {
     for (final i in _items) {
       i.name.dispose();
+      i.floatCtrl.dispose();
+      i.stickersCtrl.dispose();
     }
     super.dispose();
   }
@@ -115,20 +125,25 @@ class _RegisterDropDialogState extends ConsumerState<RegisterDropDialog> {
               ? () async {
                   final messenger = ScaffoldMessenger.of(context);
                   final navigator = Navigator.of(context);
-                  final validItems = _items
-                      .where((i) => i.name.text.trim().isNotEmpty)
-                      .map((i) => (
-                            itemName: i.name.text.trim(),
-                            category: i.category,
-                          ))
-                      .toList();
+                  final validItems =
+                      _items.where((i) => i.name.text.trim().isNotEmpty).toList();
                   await ref.read(inventoryProvider.notifier).registerDrop(
                         account: widget.account,
                         items: validItems
-                            .map((v) => (
-                                  itemName: v.itemName,
-                                  category: v.category,
+                            .map((i) => (
+                                  itemName: i.name.text.trim(),
+                                  category: i.category,
                                   quantity: 1,
+                                  floatValue: i.category.supportsWearDetails
+                                      ? parseFloatField(i.floatCtrl.text)
+                                      : null,
+                                  wear: i.category.supportsWearDetails ? i.wear : null,
+                                  statTrak: i.category.supportsWearDetails
+                                      ? i.statTrak
+                                      : false,
+                                  stickers: i.category.supportsWearDetails
+                                      ? parseStickersField(i.stickersCtrl.text)
+                                      : const <String>[],
                                 ))
                             .toList(),
                         when: DateTime.now(),
@@ -279,6 +294,21 @@ class _ItemRow extends StatelessWidget {
             );
           }).toList(),
         ),
+        if (item.category.supportsWearDetails)
+          WearDetailsFields(
+            statTrak: item.statTrak,
+            onStatTrakChanged: (v) {
+              item.statTrak = v;
+              onChanged();
+            },
+            wear: item.wear,
+            onWearChanged: (w) {
+              item.wear = w;
+              onChanged();
+            },
+            floatController: item.floatCtrl,
+            stickersController: item.stickersCtrl,
+          ),
       ],
     );
   }

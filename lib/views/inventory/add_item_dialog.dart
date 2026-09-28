@@ -7,6 +7,7 @@ import '../../models/inventory_item.dart';
 import '../../providers/accounts_provider.dart';
 import '../../providers/inventory_provider.dart';
 import '../../services/hive_service.dart' show SeedItems;
+import '../../widgets/wear_details_fields.dart';
 
 /// Diálogo para añadir manualmente un item al inventario, sin pasar por el
 /// flujo de drop de una cuenta. Útil para cargar inventario histórico.
@@ -26,14 +27,20 @@ class AddItemDialog extends ConsumerStatefulWidget {
 
 class _AddItemDialogState extends ConsumerState<AddItemDialog> {
   final _nameCtrl = TextEditingController();
+  final _floatCtrl = TextEditingController();
+  final _stickersCtrl = TextEditingController();
   ItemCategory _category = ItemCategory.skin;
   CsAccount? _selectedAccount; // null => "Sin cuenta" (manual)
   DateTime _date = DateTime.now();
   int _quantity = 1;
+  SkinWear? _wear;
+  bool _statTrak = false;
 
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _floatCtrl.dispose();
+    _stickersCtrl.dispose();
     super.dispose();
   }
 
@@ -166,6 +173,15 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                   );
                 }).toList(),
               ),
+              if (_category.supportsWearDetails)
+                WearDetailsFields(
+                  statTrak: _statTrak,
+                  onStatTrakChanged: (v) => setState(() => _statTrak = v),
+                  wear: _wear,
+                  onWearChanged: (w) => setState(() => _wear = w),
+                  floatController: _floatCtrl,
+                  stickersController: _stickersCtrl,
+                ),
               const SizedBox(height: 14),
               const Text('Cuenta (opcional)',
                   style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white70)),
@@ -296,6 +312,15 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                         obtainedAt: _date,
                         account: _selectedAccount,
                         quantity: _quantity,
+                        floatValue: _category.supportsWearDetails
+                            ? parseFloatField(_floatCtrl.text)
+                            : null,
+                        wear: _category.supportsWearDetails ? _wear : null,
+                        statTrak:
+                            _category.supportsWearDetails ? _statTrak : false,
+                        stickers: _category.supportsWearDetails
+                            ? parseStickersField(_stickersCtrl.text)
+                            : const <String>[],
                       );
                   if (!mounted) return;
                   navigator.pop();

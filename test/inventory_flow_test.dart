@@ -24,6 +24,7 @@ Future<void> _initInMemoryHive() async {
     if (!Hive.isAdapterRegistered(5)) Hive.registerAdapter(PriceCacheEntryAdapter());
     if (!Hive.isAdapterRegistered(6)) Hive.registerAdapter(AppSettingsAdapter());
     if (!Hive.isAdapterRegistered(7)) Hive.registerAdapter(SaleRecordAdapter());
+    if (!Hive.isAdapterRegistered(8)) Hive.registerAdapter(SkinWearAdapter());
 
     await Hive.openBox<CsAccount>(HiveService.accountsBoxName);
     await Hive.openBox<InventoryItem>(HiveService.inventoryBoxName);
@@ -97,6 +98,55 @@ void main() {
       );
       expect(item.totalEur, closeTo(0.75, 1e-9));
       expect(item.totalUsd, closeTo(0.80, 1e-9)); // 5 * 0.16
+    });
+
+    test('serializa float/wear/StatTrak/stickers round-trip', () async {
+      final id = _uuid.v4();
+      final item = InventoryItem(
+        id: id,
+        accountId: 'acc1',
+        accountName: 'SmokeTest',
+        itemName: 'AK-47 | Redline',
+        category: ItemCategory.skin,
+        obtainedAt: DateTime.now(),
+        floatValue: 0.0532,
+        wear: SkinWear.fieldTested,
+        statTrak: true,
+        stickers: const ['Howling Dawn', 'Katowice 2015'],
+      );
+      await HiveService.inventoryBox.put(id, item);
+      final restored = HiveService.inventoryBox.get(id);
+      expect(restored!.floatValue, closeTo(0.0532, 1e-9));
+      expect(restored.wear, SkinWear.fieldTested);
+      expect(restored.statTrak, isTrue);
+      expect(restored.stickers, ['Howling Dawn', 'Katowice 2015']);
+    });
+
+    test('float/wear/StatTrak/stickers son opcionales por defecto', () async {
+      final id = _uuid.v4();
+      final item = InventoryItem(
+        id: id,
+        accountId: 'acc1',
+        accountName: 'SmokeTest',
+        itemName: 'Kilowatt Case',
+        category: ItemCategory.caseBox,
+        obtainedAt: DateTime.now(),
+      );
+      await HiveService.inventoryBox.put(id, item);
+      final restored = HiveService.inventoryBox.get(id);
+      expect(restored!.floatValue, isNull);
+      expect(restored.wear, isNull);
+      expect(restored.statTrak, isFalse);
+      expect(restored.stickers, isEmpty);
+    });
+
+    test('supportsWearDetails solo para skin/cuchillo/guante', () {
+      expect(ItemCategory.skin.supportsWearDetails, isTrue);
+      expect(ItemCategory.knife.supportsWearDetails, isTrue);
+      expect(ItemCategory.glove.supportsWearDetails, isTrue);
+      expect(ItemCategory.caseBox.supportsWearDetails, isFalse);
+      expect(ItemCategory.graffiti.supportsWearDetails, isFalse);
+      expect(ItemCategory.other.supportsWearDetails, isFalse);
     });
 
     test('availableQuantity es 0 si está vendido', () async {

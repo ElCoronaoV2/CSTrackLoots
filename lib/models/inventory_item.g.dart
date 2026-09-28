@@ -28,13 +28,20 @@ class InventoryItemAdapter extends TypeAdapter<InventoryItem> {
       sold: fields[8] as bool,
       soldAt: fields[9] as DateTime?,
       quantity: fields[10] as int,
+      // Campos añadidos después del primer release: los registros
+      // guardados antes de esto no tienen estas keys, así que se leen
+      // como null y caen a sus valores por defecto.
+      floatValue: fields[11] as double?,
+      wear: fields[12] as SkinWear?,
+      statTrak: fields[13] as bool? ?? false,
+      stickers: (fields[14] as List?)?.cast<String>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, InventoryItem obj) {
     writer
-      ..writeByte(11)
+      ..writeByte(15)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -56,7 +63,15 @@ class InventoryItemAdapter extends TypeAdapter<InventoryItem> {
       ..writeByte(9)
       ..write(obj.soldAt)
       ..writeByte(10)
-      ..write(obj.quantity);
+      ..write(obj.quantity)
+      ..writeByte(11)
+      ..write(obj.floatValue)
+      ..writeByte(12)
+      ..write(obj.wear)
+      ..writeByte(13)
+      ..write(obj.statTrak)
+      ..writeByte(14)
+      ..write(obj.stickers);
   }
 
   @override
@@ -125,6 +140,60 @@ class ItemCategoryAdapter extends TypeAdapter<ItemCategory> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is ItemCategoryAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
+class SkinWearAdapter extends TypeAdapter<SkinWear> {
+  @override
+  final int typeId = 8;
+
+  @override
+  SkinWear read(BinaryReader reader) {
+    switch (reader.readByte()) {
+      case 0:
+        return SkinWear.factoryNew;
+      case 1:
+        return SkinWear.minimalWear;
+      case 2:
+        return SkinWear.fieldTested;
+      case 3:
+        return SkinWear.wellWorn;
+      case 4:
+        return SkinWear.battleScarred;
+      default:
+        return SkinWear.factoryNew;
+    }
+  }
+
+  @override
+  void write(BinaryWriter writer, SkinWear obj) {
+    switch (obj) {
+      case SkinWear.factoryNew:
+        writer.writeByte(0);
+        break;
+      case SkinWear.minimalWear:
+        writer.writeByte(1);
+        break;
+      case SkinWear.fieldTested:
+        writer.writeByte(2);
+        break;
+      case SkinWear.wellWorn:
+        writer.writeByte(3);
+        break;
+      case SkinWear.battleScarred:
+        writer.writeByte(4);
+        break;
+    }
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SkinWearAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

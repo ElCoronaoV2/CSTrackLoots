@@ -45,6 +45,10 @@ class BackupService {
           'sold': i.sold,
           'soldAt': i.soldAt?.toIso8601String(),
           'quantity': i.quantity,
+          'floatValue': i.floatValue,
+          'wear': i.wear?.name,
+          'statTrak': i.statTrak,
+          'stickers': i.stickers,
         }).toList();
 
     final sales = HiveService.salesBox.values.map((s) => {
@@ -160,6 +164,13 @@ class BackupService {
         (c) => c.name == catName,
         orElse: () => ItemCategory.other,
       );
+      final wearName = m['wear'] as String?;
+      final wear = wearName == null
+          ? null
+          : SkinWear.values.firstWhere(
+              (w) => w.name == wearName,
+              orElse: () => SkinWear.factoryNew,
+            );
       final item = InventoryItem(
         id: m['id'] as String,
         accountId: m['accountId'] as String,
@@ -174,6 +185,10 @@ class BackupService {
             ? null
             : DateTime.parse(m['soldAt'] as String),
         quantity: m['quantity'] as int? ?? 1,
+        floatValue: (m['floatValue'] as num?)?.toDouble(),
+        wear: wear,
+        statTrak: m['statTrak'] as bool? ?? false,
+        stickers: (m['stickers'] as List?)?.cast<String>() ?? const [],
       );
       await HiveService.inventoryBox.put(item.id, item);
     }

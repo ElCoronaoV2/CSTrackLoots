@@ -141,6 +141,7 @@ class HiveService {
     if (!Hive.isAdapterRegistered(5)) Hive.registerAdapter(PriceCacheEntryAdapter());
     if (!Hive.isAdapterRegistered(6)) Hive.registerAdapter(AppSettingsAdapter());
     if (!Hive.isAdapterRegistered(7)) Hive.registerAdapter(SaleRecordAdapter());
+    if (!Hive.isAdapterRegistered(8)) Hive.registerAdapter(SkinWearAdapter());
 
     // Apertura de boxes.
     await Hive.openBox<CsAccount>(accountsBoxName);

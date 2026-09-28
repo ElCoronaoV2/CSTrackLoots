@@ -66,6 +66,25 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
               children: [
                 Row(
                   children: [
+                    if (item.statTrak) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppTheme.csOrange,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'ST™',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
                     Flexible(
                       child: Text(
                         item.itemName,
@@ -122,6 +141,25 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
                       icon: Icons.event_outlined,
                       text: dateStr,
                     ),
+                    if (item.wear != null)
+                      _MiniChip(
+                        icon: Icons.blur_circular,
+                        text: item.floatValue != null
+                            ? '${item.wear!.shortLabel} ${item.floatValue!.toStringAsFixed(4)}'
+                            : item.wear!.shortLabel,
+                      ),
+                    if (item.wear == null && item.floatValue != null)
+                      _MiniChip(
+                        icon: Icons.blur_circular,
+                        text: item.floatValue!.toStringAsFixed(4),
+                      ),
+                    if (item.stickers.isNotEmpty)
+                      _MiniChip(
+                        icon: Icons.emoji_emotions_outlined,
+                        text: item.stickers.length == 1
+                            ? item.stickers.first
+                            : '${item.stickers.length} stickers',
+                      ),
                   ],
                 ),
               ],
