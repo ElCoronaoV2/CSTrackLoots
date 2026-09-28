@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/accounts_provider.dart';
 import '../../providers/services_providers.dart';
+import '../../services/backup_service.dart';
 import '../../services/stats_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/account_card.dart';
@@ -37,6 +38,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
       try {
         await StatsService.recordDailySnapshotIfNeeded();
+      } catch (_) {}
+
+      try {
+        await BackupService().autoBackupIfNeeded();
       } catch (_) {}
 
       final update = await ref.read(updateServiceProvider).checkForUpdate();

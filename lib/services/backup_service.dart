@@ -99,6 +99,58 @@ class BackupService {
     return path;
   }
 
+  /// Backup automático silencioso: guarda un JSON en una carpeta propia de
+  /// la app en el almacenamiento del dispositivo (visible con un gestor de
+  /// archivos en Android/data/<paquete>/files/backups), sin compartir ni
+  /// pedir permisos adicionales. Respeta el intervalo configurado en
+  /// Ajustes y conserva solo los últimos 10 backups automáticos.
+  ///
+  /// No hace nada si el auto-backup está desactivado, todavía no toca el
+  /// intervalo, o el almacenamiento externo no está disponible.
+  Future<void> autoBackupIfNeeded() async {
+    final settings = HiveService.settings;
+    if (!settings.autoBackupEnabled) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final intervalMs =
+        settings.autoBackupIntervalDays * Duration.millisecondsPerDay;
+    if (now - settings.lastAutoBackupEpochMs < intervalMs) return;
+
+    final root = await getExternalStorageDirectory();
+    if (root == null) return;
+
+    final backupsDir = Directory('${root.path}/backups');
+    await backupsDir.create(recursive: true);
+
+    final ts = DateTime.now()
+        .toIso8601String()
+        .replaceAll(':', '-')
+        .split('.')
+        .first;
+    final path = '${backupsDir.path}/cs2_tracker_backup_$ts.json';
+    await File(path).writeAsString(
+      const JsonEncoder.withIndent('  ').convert(buildBackupJson()),
+    );
+
+    // Limpieza: conservar solo los últimos 10 backups automáticos.
+    final files = backupsDir
+        .listSync()
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.json'))
+        .toList()
+      ..sort((a, b) => b.path.compareTo(a.path));
+    for (final f in files.skip(10)) {
+      try {
+        await f.delete();
+      } catch (_) {}
+    }
+
+    settings.lastAutoBackupEpochMs = now;
+    try {
+      await settings.save();
+    } catch (_) {}
+  }
+
   /// Restaura desde un JSON. Devuelve estadísticas (cuentas, items, ventas).
   Future<({int accounts, int items, int sales})> restoreFromPicker() async {
     final files = await FilePicker.pickFiles(
