@@ -1,0 +1,456 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../models/inventory_item.dart';
+import '../../providers/accounts_provider.dart';
+import '../../providers/inventory_provider.dart';
+import '../../providers/settings_provider.dart';
+import '../../theme/app_theme.dart';
+import '../../utils/formatters.dart';
+import '../../widgets/background_pattern.dart';
+import '../../widgets/cut_corner_card.dart';
+import '../../widgets/inventory_item_tile.dart';
+import '../../widgets/section_label.dart';
+import 'add_item_dialog.dart';
+import 'sales_history_screen.dart';
+
+Future<void> _refreshAll(BuildContext context, WidgetRef ref) async {
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.showSnackBar(
+    const SnackBar(
+      content: Text('Actualizando precios desde Steam (ignorando caché)...'),
+      duration: Duration(seconds: 2),
+    ),
+  );
+  final scaffold = ScaffoldMessenger.of(context);
+  await ref.read(inventoryProvider.notifier).refreshPrices(
+        force: true,
+        onProgress: (done, total) {
+          scaffold.clearSnackBars();
+          scaffold.showSnackBar(
+            SnackBar(
+              content: Text('Actualizando $done/$total...'),
+              duration: const Duration(milliseconds: 600),
+            ),
+          );
+        },
+      );
+  scaffold.clearSnackBars();
+  scaffold.showSnackBar(
+    const SnackBar(
+      backgroundColor: Color(0xFF22C55E),
+      content: Text(
+        'Precios actualizados.',
+        style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700),
+      ),
+    ),
+  );
+}
+
+class InventoryScreen extends ConsumerWidget {
+  const InventoryScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summary = ref.watch(inventorySummaryProvider);
+    final filtered = ref.watch(filteredInventoryProvider);
+    final filter = ref.watch(inventoryFilterProvider);
+    final settings = ref.watch(settingsProvider);
+    final accounts = ref.watch(accountsProvider);
+
+    return Scaffold(
+      backgroundColor: AppTheme.bgDeep,
+        appBar: AppBar(
+        backgroundColor: AppTheme.bgSurface,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, size: 22),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Row(
+          children: [
+            const Text(
+              'INVENTARIO GENERAL',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                fontSize: 18,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const Spacer(),
+            IconButton(
+              tooltip: 'Refrescar precios',
+              icon: const Icon(Icons.refresh, size: 22),
+              onPressed: () => _refreshAll(context, ref),
+            ),
+            IconButton(
+              tooltip: 'Historial de ventas',
+              icon: const Icon(Icons.receipt_long_outlined, size: 22),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const SalesHistoryScreen(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: BackgroundPattern(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+          children: [
+            _SummaryCard(
+              totalEur: summary.totalEur,
+              totalUsd: summary.totalUsd,
+              currency: settings.preferredCurrency,
+              numCases: summary.numCases,
+              numSkins: summary.numSkins,
+              numGrafitis: summary.numGrafitis,
+              numKnives: summary.numKnives,
+              numGloves: summary.numGloves,
+              numOther: summary.numOther,
+              totalActive: summary.totalActive,
+            ),
+            const SizedBox(height: 18),
+            const SectionLabel('Todas las cuentas'),
+            const SizedBox(height: 12),
+            _FiltersBar(
+              filter: filter,
+              accounts: accounts,
+              onChange: (f) =>
+                  ref.read(inventoryFilterProvider.notifier).state = f,
+            ),
+            const SizedBox(height: 14),
+            if (filtered.isEmpty)
+              CutCornerCard(
+                color: AppTheme.bgCard,
+                borderColor: AppTheme.borderStrong,
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  children: const [
+                    Icon(Icons.inbox_outlined, size: 48, color: Colors.white24),
+                    SizedBox(height: 12),
+                    Text(
+                      'No hay items que mostrar',
+                      style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Registra un drop semanal o añade un item manualmente desde el botón inferior.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white38, fontSize: 12),
+                    ),
+                  ],
+                ),
+              )
+          else
+            ...filtered.map(
+              (it) => InventoryItemTile(
+                item: it,
+                currency: settings.preferredCurrency,
+                onQuantitySold: () {},
+                onDelete: () {},
+              ),
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: AppTheme.csOrange,
+        foregroundColor: Colors.black,
+        onPressed: () => AddItemDialog.show(context),
+        icon: const Icon(Icons.add),
+        label: const Text('AÑADIR ITEM',
+            style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
+      ),
+    );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({
+    required this.totalEur,
+    required this.totalUsd,
+    required this.currency,
+    required this.numCases,
+    required this.numSkins,
+    required this.numGrafitis,
+    required this.numKnives,
+    required this.numGloves,
+    required this.numOther,
+    required this.totalActive,
+  });
+
+  final double totalEur;
+  final double totalUsd;
+  final String currency;
+  final int numCases;
+  final int numSkins;
+  final int numGrafitis;
+  final int numKnives;
+  final int numGloves;
+  final int numOther;
+  final int totalActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = currency == 'USD' ? totalUsd : totalEur;
+    return CutCornerCard(
+      color: AppTheme.bgCard,
+      borderColor: AppTheme.csOrange.withValues(alpha: 0.45),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.account_balance_wallet_outlined,
+                  color: AppTheme.csOrange, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'VALOR TOTAL ($currency)',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  letterSpacing: 1.5,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            formatPrice(total, currency),
+            style: const TextStyle(
+              fontSize: 38,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+              letterSpacing: 1.5,
+            ),
+          ),
+          if (currency == 'EUR' && totalUsd > 0)
+            Text(
+              '≈ ${formatPrice(totalUsd, 'USD')}',
+              style: const TextStyle(color: Colors.white54, fontSize: 14),
+            ),
+          if (currency == 'USD' && totalEur > 0)
+            Text(
+              '≈ ${formatPrice(totalEur, 'EUR')}',
+              style: const TextStyle(color: Colors.white54, fontSize: 14),
+            ),
+          const SizedBox(height: 14),
+          Container(height: 1, color: AppTheme.borderStrong),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _Pill(icon: Icons.inventory_2_outlined, label: 'Cajas', count: numCases, color: AppTheme.csOrange),
+              _Pill(icon: Icons.shield_outlined, label: 'Skins', count: numSkins, color: AppTheme.csCyan),
+              _Pill(icon: Icons.brush_outlined, label: 'Graffiti', count: numGrafitis, color: AppTheme.csPink),
+              _Pill(icon: Icons.colorize, label: 'Cuchillos', count: numKnives, color: AppTheme.csRed),
+              _Pill(icon: Icons.back_hand_outlined, label: 'Guantes', count: numGloves, color: AppTheme.csPurple),
+              if (numOther > 0)
+                _Pill(icon: Icons.help_outline, label: 'Otros', count: numOther, color: Colors.white60),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'El valor total se calcula en base a los precios de mercado de CS2.',
+            style: const TextStyle(color: Colors.white54, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill({
+    required this.icon,
+    required this.label,
+    required this.count,
+    required this.color,
+  });
+  final IconData icon;
+  final String label;
+  final int count;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            '$count',
+            style: TextStyle(color: color, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FiltersBar extends StatelessWidget {
+  const _FiltersBar({
+    required this.filter,
+    required this.accounts,
+    required this.onChange,
+  });
+
+  final InventoryFilter filter;
+  final List accounts;
+  final ValueChanged<InventoryFilter> onChange;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              ChoiceChip(
+                label: const Text('Todos'),
+                selected: filter.category == null,
+                onSelected: (_) => onChange(InventoryFilter(
+                  category: null,
+                  accountId: filter.accountId,
+                  includeSold: filter.includeSold,
+                  sort: filter.sort,
+                )),
+              ),
+              const SizedBox(width: 6),
+              ...ItemCategory.values.map(
+                (c) => Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: ChoiceChip(
+                    label: Text(c.label),
+                    selected: filter.category == c,
+                    onSelected: (_) => onChange(InventoryFilter(
+                      category: c,
+                      accountId: filter.accountId,
+                      includeSold: filter.includeSold,
+                      sort: filter.sort,
+                    )),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF161A20),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF2A313B)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String?>(
+                    value: filter.accountId,
+                    isExpanded: true,
+                    dropdownColor: const Color(0xFF161A20),
+                    hint: const Text('Todas las cuentas', style: TextStyle(color: Colors.white54)),
+                    icon: const Icon(Icons.expand_more, color: Colors.white54),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('Todas las cuentas'),
+                      ),
+                      ...accounts.map<DropdownMenuItem<String?>>((a) {
+                        return DropdownMenuItem<String?>(
+                          value: a.id,
+                          child: Text(a.alias),
+                        );
+                      }),
+                    ],
+                    onChanged: (v) => onChange(InventoryFilter(
+                      category: filter.category,
+                      accountId: v,
+                      includeSold: filter.includeSold,
+                      sort: filter.sort,
+                    )),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Row(
+              children: [
+                Checkbox(
+                  value: filter.includeSold,
+                  onChanged: (v) => onChange(InventoryFilter(
+                    category: filter.category,
+                    accountId: filter.accountId,
+                    includeSold: v ?? false,
+                    sort: filter.sort,
+                  )),
+                ),
+                const Text('Incluir vendidos', style: TextStyle(color: Colors.white70)),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            const Icon(Icons.sort, size: 16, color: Colors.white54),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF161A20),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF2A313B)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<InventorySort>(
+                    value: filter.sort,
+                    isExpanded: true,
+                    dropdownColor: const Color(0xFF161A20),
+                    icon: const Icon(Icons.expand_more, color: Colors.white54),
+                    items: [
+                      for (final s in InventorySort.values)
+                        DropdownMenuItem(value: s, child: Text(s.label)),
+                    ],
+                    onChanged: (v) {
+                      if (v == null) return;
+                      onChange(InventoryFilter(
+                        category: filter.category,
+                        accountId: filter.accountId,
+                        includeSold: filter.includeSold,
+                        sort: v,
+                      ));
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}

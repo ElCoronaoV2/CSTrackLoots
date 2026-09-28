@@ -1,0 +1,37 @@
+# Build artifacts
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+pubspec.lock
+*.iml
+.idea/
+*.iws
+.gradle/
+local.properties
+.cxx/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+
+# Test / temp
+test/.tmp_hive_test/
+test/.tmp_hive_*/
+
+# Generated
+*.g.dart.bak
+
+# Backups
+*.apk
+*.apk.sha1
+*.aab
+
+# Logs
+*.log

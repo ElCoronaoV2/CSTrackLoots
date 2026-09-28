@@ -1,0 +1,287 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../providers/accounts_provider.dart';
+import '../../providers/services_providers.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/account_card.dart';
+import '../../widgets/background_pattern.dart';
+import '../../widgets/countdown_header.dart';
+import '../../widgets/cut_corner_card.dart';
+import '../../widgets/section_label.dart';
+import '../account/account_detail_screen.dart';
+import '../drop/register_drop_dialog.dart';
+import '../inventory/inventory_screen.dart';
+import '../settings/settings_screen.dart';
+
+class HomeScreen extends ConsumerStatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Verificar reset al abrir la app.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ref.read(orchestratorProvider).runStartupCheck();
+      if (!mounted) return;
+      // Si el orquestador marcó un reset, pedir también refresh del estado.
+      ref.read(accountsProvider.notifier);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final accounts = ref.watch(accountsProvider);
+    final countdownAsync = ref.watch(countdownStreamProvider);
+    final pending = accounts
+        .where((a) => !a.dropObtainedThisWeek && !a.dropMissedThisWeek)
+        .length;
+    final missed = accounts.where((a) => a.dropMissedThisWeek).length;
+    final completed = accounts.where((a) => a.dropObtainedThisWeek).length;
+    final nextResetDate = ref.read(weeklyResetServiceProvider).nextReset().toLocal();
+
+    return Scaffold(
+      backgroundColor: AppTheme.bgDeep,
+      appBar: AppBar(
+        backgroundColor: AppTheme.bgSurface,
+        title: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.asset(
+                'assets/cs2_logo.jpg',
+                width: 32,
+                height: 32,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'CS2',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                fontSize: 22,
+                letterSpacing: 1,
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Text(
+              'TRACKER',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                color: AppTheme.csOrange,
+                fontSize: 22,
+                letterSpacing: 1.4,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.inventory_2_outlined, size: 22),
+            tooltip: 'Inventario General',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const InventoryScreen()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, size: 22),
+            tooltip: 'Ajustes',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+          ),
+        ],
+      ),
+      body: BackgroundPattern(
+        child: RefreshIndicator(
+          onRefresh: () async {
+            await ref.read(orchestratorProvider).runStartupCheck();
+          },
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+            children: [
+              countdownAsync.when(
+                data: (d) => CountdownHeader(
+                  countdown: d,
+                  total: accounts.length,
+                  pending: pending,
+                  missed: missed,
+                  completed: completed,
+                  nextResetDate: nextResetDate,
+                ),
+                loading: () => const SizedBox(
+                  height: 200,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (e, _) => Text('Error: $e'),
+              ),
+              const SizedBox(height: 22),
+              SectionLabel(
+                'Mis cuentas',
+                trailing: Text(
+                  '${accounts.length} jugadores',
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (accounts.isEmpty)
+                _EmptyState(
+                  onAdd: () => _showAddAccountDialog(context),
+                )
+              else
+                ...accounts.map(
+                  (a) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: AccountCard(
+                      account: a,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => AccountDetailScreen(accountId: a.id),
+                          ),
+                        );
+                      },
+                      onRegisterDrop: () => _openRegisterDrop(context, a.id),
+                      onDelete: () => _confirmDelete(context, a.id, a.alias),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+      floatingActionButton: accounts.isEmpty
+          ? null
+          : FloatingActionButton.extended(
+              backgroundColor: AppTheme.csOrange,
+              foregroundColor: Colors.black,
+              onPressed: () => _showAddAccountDialog(context),
+              icon: const Icon(Icons.add),
+              label: const Text('AÑADIR CUENTA',
+                  style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
+            ),
+    );
+  }
+
+  Future<void> _showAddAccountDialog(BuildContext context) async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Nueva cuenta'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Alias o nombre de la cuenta',
+              prefixIcon: Icon(Icons.person_add_alt_1_outlined),
+            ),
+            onSubmitted: (v) => Navigator.of(ctx).pop(v),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(controller.text),
+              child: const Text('Guardar'),
+            ),
+          ],
+        );
+      },
+    );
+    if (result != null && result.trim().isNotEmpty) {
+      await ref.read(accountsProvider.notifier).addAccount(result.trim());
+    }
+  }
+
+  Future<void> _confirmDelete(BuildContext context, String id, String alias) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('¿Eliminar "$alias"?'),
+        content: const Text(
+          'La cuenta se eliminará. Los items ya registrados en el inventario NO se borrarán.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await ref.read(accountsProvider.notifier).deleteAccount(id);
+    }
+  }
+
+  Future<void> _openRegisterDrop(BuildContext context, String accountId) async {
+    final list = ref.read(accountsProvider);
+    final acc = list.firstWhere((a) => a.id == accountId);
+    if (!mounted) return;
+    await RegisterDropDialog.show(context, account: acc);
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.onAdd});
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return CutCornerCard(
+      color: AppTheme.bgCard,
+      borderColor: AppTheme.csOrange.withValues(alpha: 0.5),
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        children: [
+          const Icon(Icons.gamepad_outlined, size: 56, color: AppTheme.csOrange),
+          const SizedBox(height: 12),
+          const Text(
+            'Aún no tienes cuentas registradas',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Añade tus cuentas de CS2 (sólo alias, sin credenciales) para empezar a gestionar drops y rangos.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white60, fontSize: 13),
+          ),
+          const SizedBox(height: 18),
+          FilledButton.icon(
+            onPressed: onAdd,
+            icon: const Icon(Icons.add),
+            label: const Text('AÑADIR PRIMERA CUENTA'),
+          ),
+        ],
+      ),
+    );
+  }
+}

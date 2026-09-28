@@ -1,0 +1,130 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'inventory_item.dart';
+
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
+
+class InventoryItemAdapter extends TypeAdapter<InventoryItem> {
+  @override
+  final int typeId = 4;
+
+  @override
+  InventoryItem read(BinaryReader reader) {
+    final numOfFields = reader.readByte();
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
+    return InventoryItem(
+      id: fields[0] as String,
+      accountId: fields[1] as String,
+      accountName: fields[2] as String,
+      itemName: fields[3] as String,
+      category: fields[4] as ItemCategory,
+      priceEur: fields[5] as double,
+      priceUsd: fields[6] as double,
+      obtainedAt: fields[7] as DateTime?,
+      sold: fields[8] as bool,
+      soldAt: fields[9] as DateTime?,
+      quantity: fields[10] as int,
+    );
+  }
+
+  @override
+  void write(BinaryWriter writer, InventoryItem obj) {
+    writer
+      ..writeByte(11)
+      ..writeByte(0)
+      ..write(obj.id)
+      ..writeByte(1)
+      ..write(obj.accountId)
+      ..writeByte(2)
+      ..write(obj.accountName)
+      ..writeByte(3)
+      ..write(obj.itemName)
+      ..writeByte(4)
+      ..write(obj.category)
+      ..writeByte(5)
+      ..write(obj.priceEur)
+      ..writeByte(6)
+      ..write(obj.priceUsd)
+      ..writeByte(7)
+      ..write(obj.obtainedAt)
+      ..writeByte(8)
+      ..write(obj.sold)
+      ..writeByte(9)
+      ..write(obj.soldAt)
+      ..writeByte(10)
+      ..write(obj.quantity);
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is InventoryItemAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
+class ItemCategoryAdapter extends TypeAdapter<ItemCategory> {
+  @override
+  final int typeId = 3;
+
+  @override
+  ItemCategory read(BinaryReader reader) {
+    switch (reader.readByte()) {
+      case 0:
+        return ItemCategory.caseBox;
+      case 1:
+        return ItemCategory.skin;
+      case 2:
+        return ItemCategory.graffiti;
+      case 3:
+        return ItemCategory.knife;
+      case 4:
+        return ItemCategory.glove;
+      case 5:
+        return ItemCategory.other;
+      default:
+        return ItemCategory.caseBox;
+    }
+  }
+
+  @override
+  void write(BinaryWriter writer, ItemCategory obj) {
+    switch (obj) {
+      case ItemCategory.caseBox:
+        writer.writeByte(0);
+        break;
+      case ItemCategory.skin:
+        writer.writeByte(1);
+        break;
+      case ItemCategory.graffiti:
+        writer.writeByte(2);
+        break;
+      case ItemCategory.knife:
+        writer.writeByte(3);
+        break;
+      case ItemCategory.glove:
+        writer.writeByte(4);
+        break;
+      case ItemCategory.other:
+        writer.writeByte(5);
+        break;
+    }
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ItemCategoryAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
