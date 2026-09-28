@@ -39,7 +39,16 @@ class _Cs2TrackerAppState extends ConsumerState<Cs2TrackerApp> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
-        await ref.read(notificationServiceProvider).init();
+        final notifications = ref.read(notificationServiceProvider);
+        await notifications.init();
+        // Android 13+ (y iOS) requieren pedir el permiso explícitamente;
+        // sin esto, las notificaciones quedan activadas en Ajustes (por
+        // defecto) pero nunca llegan a mostrarse. El sistema no vuelve a
+        // preguntar si ya se concedió o se denegó antes, así que es seguro
+        // llamarlo en cada arranque.
+        if (HiveService.settings.notificationsEnabled) {
+          await notifications.requestPermissions();
+        }
       } catch (_) {}
       try {
         await ref.read(orchestratorProvider).runStartupCheck();
