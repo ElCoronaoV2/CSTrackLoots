@@ -30,6 +30,16 @@ class AppSettings extends HiveObject {
   @HiveField(6)
   int lastAutoBackupEpochMs;
 
+  /// Steam Web API key del usuario (propia, gratuita, revocable en
+  /// steamcommunity.com/dev/apikey). Se guarda SOLO en este dispositivo:
+  /// nunca viaja al repositorio, a CI ni al APK distribuido.
+  @HiveField(7)
+  String? steamApiKey;
+
+  /// SteamID64 del usuario, para consultar sus estadísticas de CS2.
+  @HiveField(8)
+  String? steamId64;
+
   AppSettings({
     this.preferredCurrency = 'EUR',
     this.notificationsEnabled = true,
@@ -38,8 +48,13 @@ class AppSettings extends HiveObject {
     this.autoBackupEnabled = true,
     this.autoBackupIntervalDays = 7,
     this.lastAutoBackupEpochMs = 0,
+    this.steamApiKey,
+    this.steamId64,
   });
 
+  /// Copia el estado cambiando solo los campos indicados. Para borrar
+  /// steamApiKey/steamId64 usa [clearSteamCredentials] en vez de esto:
+  /// aquí un valor null en esos dos campos significa "no tocar".
   AppSettings copyWith({
     String? preferredCurrency,
     bool? notificationsEnabled,
@@ -48,6 +63,8 @@ class AppSettings extends HiveObject {
     bool? autoBackupEnabled,
     int? autoBackupIntervalDays,
     int? lastAutoBackupEpochMs,
+    String? steamApiKey,
+    String? steamId64,
   }) {
     return AppSettings(
       preferredCurrency: preferredCurrency ?? this.preferredCurrency,
@@ -61,6 +78,22 @@ class AppSettings extends HiveObject {
           autoBackupIntervalDays ?? this.autoBackupIntervalDays,
       lastAutoBackupEpochMs:
           lastAutoBackupEpochMs ?? this.lastAutoBackupEpochMs,
+      steamApiKey: steamApiKey ?? this.steamApiKey,
+      steamId64: steamId64 ?? this.steamId64,
+    );
+  }
+
+  /// Copia el estado quitando la key/SteamID guardadas (a diferencia de
+  /// [copyWith], aquí sí se pueden poner a null explícitamente).
+  AppSettings clearSteamCredentials() {
+    return AppSettings(
+      preferredCurrency: preferredCurrency,
+      notificationsEnabled: notificationsEnabled,
+      remind24hBeforeReset: remind24hBeforeReset,
+      lastProcessedResetEpochMs: lastProcessedResetEpochMs,
+      autoBackupEnabled: autoBackupEnabled,
+      autoBackupIntervalDays: autoBackupIntervalDays,
+      lastAutoBackupEpochMs: lastAutoBackupEpochMs,
     );
   }
 }
