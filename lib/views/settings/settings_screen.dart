@@ -7,7 +7,6 @@ import '../../providers/services_providers.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/backup_service.dart';
 import '../../services/steam_stats_service.dart';
-import '../../theme/app_theme.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
