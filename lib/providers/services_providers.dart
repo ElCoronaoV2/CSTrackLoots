@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/drop_cycle_orchestrator.dart';
 import '../services/notification_service.dart';
 import '../services/steam_market_service.dart';
+import '../services/update_service.dart';
 import '../services/weekly_reset_service.dart';
 
 /// Servicios singleton (no se reconstruyen durante la vida de la app).
@@ -25,6 +26,10 @@ final orchestratorProvider = Provider<DropCycleOrchestrator>((ref) {
 
 final steamMarketServiceProvider = Provider<SteamMarketService>((ref) {
   return SteamMarketService();
+});
+
+final updateServiceProvider = Provider<UpdateService>((ref) {
+  return UpdateService();
 });
 
 /// Stream que emite la duración restante hasta el próximo reset cada segundo.

@@ -10,6 +10,9 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
 
+    <!-- Permite abrir el instalador del sistema con el APK de actualización descargado. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+
     <application
         android:label="CS2 Tracker"
         android:name="${applicationName}"

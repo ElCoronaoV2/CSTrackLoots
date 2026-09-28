@@ -9,6 +9,7 @@ import '../../widgets/background_pattern.dart';
 import '../../widgets/countdown_header.dart';
 import '../../widgets/cut_corner_card.dart';
 import '../../widgets/section_label.dart';
+import '../../widgets/update_dialog.dart';
 import '../account/account_detail_screen.dart';
 import '../drop/register_drop_dialog.dart';
 import '../inventory/inventory_screen.dart';
@@ -31,6 +32,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (!mounted) return;
       // Si el orquestador marcó un reset, pedir también refresh del estado.
       ref.read(accountsProvider.notifier);
+
+      final update = await ref.read(updateServiceProvider).checkForUpdate();
+      if (update != null && mounted) {
+        showUpdateDialog(context, update);
+      }
     });
   }
 
