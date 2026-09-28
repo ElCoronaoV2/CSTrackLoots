@@ -58,6 +58,12 @@ class CsAccount extends HiveObject {
   @HiveField(12)
   int bestStreak;
 
+  /// SteamID64 de esta cuenta concreta, para consultar sus stats de CS2 de
+  /// por vida con la API key global guardada en Ajustes. Opcional: cada
+  /// cuenta tiene el suyo, a diferencia de la API key (que es una sola).
+  @HiveField(13)
+  String? steamId64;
+
   CsAccount({
     required this.id,
     required this.alias,
@@ -72,6 +78,7 @@ class CsAccount extends HiveObject {
     this.totalMissed = 0,
     this.currentStreak = 0,
     this.bestStreak = 0,
+    this.steamId64,
   }) : mapRanks = mapRanks ?? <String, String>{};
 
   /// Total de semanas contabilizadas (obtenidos + perdidos).

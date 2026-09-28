@@ -6,7 +6,6 @@ import '../../providers/accounts_provider.dart';
 import '../../providers/services_providers.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/backup_service.dart';
-import '../../services/steam_stats_service.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -178,10 +177,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _SteamSection(
-            initialApiKey: settings.steamApiKey,
-            initialSteamId: settings.steamId64,
-          ),
+          _SteamSection(initialApiKey: settings.steamApiKey),
           const SizedBox(height: 16),
           _Section(
             title: 'Acerca de',
@@ -241,10 +237,9 @@ class _Section extends StatelessWidget {
 }
 
 class _SteamSection extends ConsumerStatefulWidget {
-  const _SteamSection({required this.initialApiKey, required this.initialSteamId});
+  const _SteamSection({required this.initialApiKey});
 
   final String? initialApiKey;
-  final String? initialSteamId;
 
   @override
   ConsumerState<_SteamSection> createState() => _SteamSectionState();
@@ -252,77 +247,44 @@ class _SteamSection extends ConsumerStatefulWidget {
 
 class _SteamSectionState extends ConsumerState<_SteamSection> {
   late final TextEditingController _keyCtrl;
-  late final TextEditingController _idCtrl;
   bool _obscureKey = true;
-  bool _loading = false;
-  Cs2LifetimeStats? _stats;
-  String? _error;
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
     _keyCtrl = TextEditingController(text: widget.initialApiKey ?? '');
-    _idCtrl = TextEditingController(text: widget.initialSteamId ?? '');
   }
 
   @override
   void dispose() {
     _keyCtrl.dispose();
-    _idCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     final key = _keyCtrl.text.trim();
-    final id = _idCtrl.text.trim();
-    if (key.isEmpty || id.isEmpty) {
+    if (key.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Introduce la API key y el SteamID64.')),
+        const SnackBar(content: Text('Introduce tu Steam Web API key.')),
       );
       return;
     }
-    await ref
-        .read(settingsProvider.notifier)
-        .setSteamCredentials(apiKey: key, steamId64: id);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Credenciales guardadas en este dispositivo.')),
-      );
-    }
-    await _test();
-  }
-
-  Future<void> _test() async {
-    final key = _keyCtrl.text.trim();
-    final id = _idCtrl.text.trim();
-    if (key.isEmpty || id.isEmpty) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    final service = ref.read(steamStatsServiceProvider);
-    final stats = await service.fetchLifetimeStats(apiKey: key, steamId64: id);
+    setState(() => _saving = true);
+    await ref.read(settingsProvider.notifier).setSteamApiKey(key);
     if (!mounted) return;
-    setState(() {
-      _loading = false;
-      _stats = stats;
-      _error = stats == null
-          ? 'No se pudieron obtener estadísticas. Revisa la key, el SteamID64 y que el perfil y las stats de CS2 sean públicos.'
-          : null;
-    });
+    setState(() => _saving = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('API key guardada en este dispositivo.')),
+    );
   }
 
   Future<void> _clear() async {
-    await ref.read(settingsProvider.notifier).clearSteamCredentials();
+    await ref.read(settingsProvider.notifier).clearSteamApiKey();
     _keyCtrl.clear();
-    _idCtrl.clear();
-    setState(() {
-      _stats = null;
-      _error = null;
-    });
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Credenciales de Steam eliminadas.')),
+        const SnackBar(content: Text('API key de Steam eliminada.')),
       );
     }
   }
@@ -335,7 +297,7 @@ class _SteamSectionState extends ConsumerState<_SteamSection> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Introduce tu Steam Web API key y tu SteamID64 para ver tus estadísticas de CS2 de por vida (kills, victorias, ratio K/D, horas jugadas...). Valve no expone el rango competitivo por esta vía, solo contadores históricos. Se guardan SOLO en este dispositivo, nunca se suben a internet ni al repositorio.',
+            'Introduce tu Steam Web API key (una sola, gratuita, revocable en steamcommunity.com/dev/apikey) para ver las estadísticas de CS2 de por vida de tus cuentas. Después, en la ficha de cada cuenta, añade su SteamID64 para consultar sus stats. Se guarda SOLO en este dispositivo, nunca se sube a internet ni al repositorio.',
             style: TextStyle(color: Colors.white70, fontSize: 12),
           ),
           const SizedBox(height: 12),
@@ -351,99 +313,26 @@ class _SteamSectionState extends ConsumerState<_SteamSection> {
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _idCtrl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'SteamID64',
-              border: OutlineInputBorder(),
-            ),
-          ),
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: _loading ? null : _save,
+                  onPressed: _saving ? null : _save,
                   icon: const Icon(Icons.save_outlined),
-                  label: const Text('Guardar y comprobar'),
+                  label: const Text('Guardar'),
                 ),
               ),
               const SizedBox(width: 8),
               IconButton(
-                onPressed: _loading ? null : _clear,
+                onPressed: _saving ? null : _clear,
                 icon: const Icon(Icons.delete_outline),
-                tooltip: 'Eliminar credenciales',
+                tooltip: 'Eliminar API key',
               ),
             ],
           ),
-          if (_loading) ...[
-            const SizedBox(height: 16),
-            const Center(child: CircularProgressIndicator()),
-          ],
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(_error!, style: const TextStyle(color: Color(0xFFF87171), fontSize: 12)),
-          ],
-          if (_stats != null) ...[
-            const SizedBox(height: 16),
-            _StatsGrid(stats: _stats!),
-          ],
         ],
       ),
-    );
-  }
-}
-
-class _StatsGrid extends StatelessWidget {
-  const _StatsGrid({required this.stats});
-
-  final Cs2LifetimeStats stats;
-
-  @override
-  Widget build(BuildContext context) {
-    final hours = stats.timePlayed.inMinutes / 60;
-    final items = <(String, String)>[
-      ('Kills', '${stats.kills}'),
-      ('Muertes', '${stats.deaths}'),
-      ('Ratio K/D', stats.kdRatio.toStringAsFixed(2)),
-      ('Victorias', '${stats.wins}'),
-      ('Partidas', '${stats.matchesPlayed}'),
-      ('% victorias', '${stats.winRatePercent.toStringAsFixed(1)}%'),
-      ('MVPs', '${stats.mvps}'),
-      ('% headshot', '${stats.headshotPercent.toStringAsFixed(1)}%'),
-      ('Precisión', '${stats.accuracyPercent.toStringAsFixed(1)}%'),
-      ('Horas jugadas', hours.toStringAsFixed(0)),
-    ];
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 2.6,
-      crossAxisSpacing: 8,
-      mainAxisSpacing: 8,
-      children: items.map((e) {
-        return Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F1318),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFF2A313B)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(e.$2,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800, fontSize: 16)),
-              Text(e.$1,
-                  style: const TextStyle(color: Colors.white60, fontSize: 11)),
-            ],
-          ),
-        );
-      }).toList(),
     );
   }
 }

@@ -4,9 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/cs_account.dart';
 import '../../models/cs_rank_enums.dart';
 import '../../providers/accounts_provider.dart';
+import '../../providers/services_providers.dart';
+import '../../providers/settings_provider.dart';
+import '../../services/steam_stats_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/rank_widgets.dart';
+import '../../widgets/steam_stats_grid.dart';
 import '../drop/register_drop_dialog.dart';
+import '../settings/settings_screen.dart';
 
 class AccountDetailScreen extends ConsumerStatefulWidget {
   const AccountDetailScreen({super.key, required this.accountId});
@@ -18,17 +23,23 @@ class AccountDetailScreen extends ConsumerStatefulWidget {
 
 class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
   late TextEditingController _premierCtrl;
+  late TextEditingController _steamIdCtrl;
+  bool _steamLoading = false;
+  Cs2LifetimeStats? _steamStats;
+  String? _steamError;
 
   @override
   void initState() {
     super.initState();
     final acc = ref.read(accountByIdProvider(widget.accountId));
     _premierCtrl = TextEditingController(text: (acc?.premierRating ?? 0).toString());
+    _steamIdCtrl = TextEditingController(text: acc?.steamId64 ?? '');
   }
 
   @override
   void dispose() {
     _premierCtrl.dispose();
+    _steamIdCtrl.dispose();
     super.dispose();
   }
 
@@ -45,6 +56,62 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
         const SnackBar(content: Text('Cambios guardados.')),
       );
     }
+  }
+
+  Future<void> _saveSteamIdAndFetch() async {
+    final acc = _getAccount();
+    if (acc == null) return;
+    final apiKey = ref.read(settingsProvider).steamApiKey;
+    if (apiKey == null || apiKey.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Antes configura tu Steam Web API key en Ajustes.'),
+          action: SnackBarAction(
+            label: 'Ir a Ajustes',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+    final steamId = _steamIdCtrl.text.trim();
+    if (steamId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Introduce el SteamID64 de esta cuenta.')),
+      );
+      return;
+    }
+    acc.steamId64 = steamId;
+    await ref.read(accountsProvider.notifier).updateAccount(acc);
+    setState(() {
+      _steamLoading = true;
+      _steamError = null;
+    });
+    final service = ref.read(steamStatsServiceProvider);
+    final stats =
+        await service.fetchLifetimeStats(apiKey: apiKey, steamId64: steamId);
+    if (!mounted) return;
+    setState(() {
+      _steamLoading = false;
+      _steamStats = stats;
+      _steamError = stats == null
+          ? 'No se pudieron obtener estadísticas. Revisa el SteamID64 y que el perfil y las stats de CS2 de esta cuenta sean públicos.'
+          : null;
+    });
+  }
+
+  Future<void> _clearSteamId() async {
+    final acc = _getAccount();
+    if (acc == null) return;
+    acc.steamId64 = null;
+    await ref.read(accountsProvider.notifier).updateAccount(acc);
+    _steamIdCtrl.clear();
+    setState(() {
+      _steamStats = null;
+      _steamError = null;
+    });
   }
 
   @override
@@ -177,6 +244,66 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
               border: Border.all(color: AppTheme.borderStrong),
             ),
             child: _AccountStatsGrid(account: account),
+          ),
+          const SizedBox(height: 20),
+          _SectionTitle(icon: Icons.videogame_asset_outlined, title: 'Estadísticas de Steam (CS2)'),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF161A20),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.borderStrong),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Introduce el SteamID64 de esta cuenta para ver sus kills, muertes, ratio K/D, victorias y horas jugadas de por vida. Necesitas tener tu API key configurada en Ajustes primero.',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _steamIdCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'SteamID64 de esta cuenta',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _steamLoading ? null : _saveSteamIdAndFetch,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Guardar y consultar'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: _steamLoading ? null : _clearSteamId,
+                      icon: const Icon(Icons.delete_outline),
+                      tooltip: 'Quitar SteamID64',
+                    ),
+                  ],
+                ),
+                if (_steamLoading) ...[
+                  const SizedBox(height: 16),
+                  const Center(child: CircularProgressIndicator()),
+                ],
+                if (_steamError != null) ...[
+                  const SizedBox(height: 12),
+                  Text(_steamError!,
+                      style: const TextStyle(color: Color(0xFFF87171), fontSize: 12)),
+                ],
+                if (_steamStats != null) ...[
+                  const SizedBox(height: 16),
+                  SteamStatsGrid(stats: _steamStats!),
+                ],
+              ],
+            ),
           ),
           const SizedBox(height: 20),
           _SectionTitle(icon: Icons.flag, title: 'Estado semanal'),

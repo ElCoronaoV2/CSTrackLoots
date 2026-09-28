@@ -30,6 +30,7 @@ class BackupService {
               'totalMissed': a.totalMissed,
               'currentStreak': a.currentStreak,
               'bestStreak': a.bestStreak,
+              'steamId64': a.steamId64,
             })
         .toList();
 
@@ -206,6 +207,7 @@ class BackupService {
         totalMissed: m['totalMissed'] as int? ?? 0,
         currentStreak: m['currentStreak'] as int? ?? 0,
         bestStreak: m['bestStreak'] as int? ?? 0,
+        steamId64: m['steamId64'] as String?,
       );
       await HiveService.accountsBox.put(acc.id, acc);
     }
