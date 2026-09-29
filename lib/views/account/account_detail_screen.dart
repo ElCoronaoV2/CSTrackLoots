@@ -308,6 +308,27 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
                 if (_steamStats != null) ...[
                   const SizedBox(height: 16),
                   SteamStatsGrid(stats: _steamStats!),
+                  const SizedBox(height: 16),
+                  const Text('TOP ARMAS',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
+                          fontSize: 11,
+                          color: Colors.white60)),
+                  const SizedBox(height: 8),
+                  SteamWeaponStatsList(
+                    weapons: _steamStats!.weapons,
+                    specialKills: _steamStats!.specialKills,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('MAPAS JUGADOS',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
+                          fontSize: 11,
+                          color: Colors.white60)),
+                  const SizedBox(height: 8),
+                  SteamMapStatsList(maps: _steamStats!.maps),
                 ],
               ],
             ),
