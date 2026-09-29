@@ -5,8 +5,10 @@ import '../models/cs_account.dart';
 import '../models/cs_rank_enums.dart';
 import '../models/inventory_item.dart';
 import '../models/price_cache_entry.dart';
+import '../models/rank_snapshot.dart';
 import '../models/sale_record.dart';
 import '../models/value_snapshot.dart';
+import '../models/watchlist_item.dart';
 
 /// Nombre de las cajas y collections usadas en el autocompletado del drop.
 /// Lista curada de CS2 a fecha del proyecto. El usuario puede escribir libremente.
@@ -127,6 +129,8 @@ class HiveService {
   static const String settingsBoxName = 'settings';
   static const String salesBoxName = 'sales';
   static const String valueSnapshotsBoxName = 'value_snapshots';
+  static const String watchlistBoxName = 'watchlist';
+  static const String rankSnapshotsBoxName = 'rank_snapshots';
   static const String settingsKey = 'app_settings';
 
   static Future<void> init() async {
@@ -147,6 +151,12 @@ class HiveService {
     if (!Hive.isAdapterRegistered(9)) {
       Hive.registerAdapter(ValueSnapshotAdapter());
     }
+    if (!Hive.isAdapterRegistered(10)) {
+      Hive.registerAdapter(WatchlistItemAdapter());
+    }
+    if (!Hive.isAdapterRegistered(11)) {
+      Hive.registerAdapter(RankSnapshotAdapter());
+    }
 
     // Apertura de boxes.
     await Hive.openBox<CsAccount>(accountsBoxName);
@@ -154,6 +164,8 @@ class HiveService {
     await Hive.openBox<PriceCacheEntry>(priceCacheBoxName);
     await Hive.openBox<SaleRecord>(salesBoxName);
     await Hive.openBox<ValueSnapshot>(valueSnapshotsBoxName);
+    await Hive.openBox<WatchlistItem>(watchlistBoxName);
+    await Hive.openBox<RankSnapshot>(rankSnapshotsBoxName);
     final settingsBox = await Hive.openBox<AppSettings>(settingsBoxName);
 
     if (settingsBox.get(settingsKey) == null) {
@@ -171,6 +183,10 @@ class HiveService {
   static Box<SaleRecord> get salesBox => Hive.box<SaleRecord>(salesBoxName);
   static Box<ValueSnapshot> get valueSnapshotsBox =>
       Hive.box<ValueSnapshot>(valueSnapshotsBoxName);
+  static Box<WatchlistItem> get watchlistBox =>
+      Hive.box<WatchlistItem>(watchlistBoxName);
+  static Box<RankSnapshot> get rankSnapshotsBox =>
+      Hive.box<RankSnapshot>(rankSnapshotsBoxName);
 
   static AppSettings get settings => settingsBox.get(settingsKey)!;
 }

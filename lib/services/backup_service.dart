@@ -53,6 +53,7 @@ class BackupService {
           'alertThreshold': i.alertThreshold,
           'alertCurrency': i.alertCurrency,
           'alerted': i.alerted,
+          'alertBelow': i.alertBelow,
         }).toList();
 
     final sales = HiveService.salesBox.values.map((s) => {
@@ -249,6 +250,7 @@ class BackupService {
         alertThreshold: (m['alertThreshold'] as num?)?.toDouble(),
         alertCurrency: m['alertCurrency'] as String?,
         alerted: m['alerted'] as bool? ?? false,
+        alertBelow: m['alertBelow'] as bool? ?? false,
       );
       await HiveService.inventoryBox.put(item.id, item);
     }

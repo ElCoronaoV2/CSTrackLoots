@@ -29,7 +29,14 @@ class DropCycleOrchestrator {
     if (lastProcessed < lastResetMs) {
       // Cruzamos un reset desde la última vez: consolidar estadísticas y reset
       // de estados de la semana.
+      var obtained = 0;
+      var missed = 0;
       for (final acc in HiveService.accountsBox.values) {
+        if (acc.dropObtainedThisWeek) {
+          obtained++;
+        } else {
+          missed++;
+        }
         _updateStatsForAccount(acc);
         acc.dropObtainedThisWeek = false;
         acc.dropMissedThisWeek = false;
@@ -42,6 +49,27 @@ class DropCycleOrchestrator {
         await settings.save();
       } catch (_) {}
       processedReset = true;
+
+      // Solo tiene sentido el resumen si había al menos una cuenta activa
+      // esa semana (evita la notificación vacía "0/0" en el primer arranque).
+      if (settings.notificationsEnabled && (obtained + missed) > 0) {
+        double totalValue = 0;
+        for (final item in HiveService.inventoryBox.values) {
+          if (item.sold) continue;
+          totalValue += (settings.preferredCurrency == 'USD'
+                  ? item.priceUsd
+                  : item.priceEur) *
+              item.quantity;
+        }
+        try {
+          await _notifications.showWeeklySummary(
+            obtained: obtained,
+            missed: missed,
+            totalValue: totalValue,
+            currency: settings.preferredCurrency,
+          );
+        } catch (_) {}
+      }
     }
 
     await _reschedule();

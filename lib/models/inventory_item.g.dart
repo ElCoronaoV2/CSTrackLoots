@@ -38,13 +38,14 @@ class InventoryItemAdapter extends TypeAdapter<InventoryItem> {
       alertThreshold: fields[15] as double?,
       alertCurrency: fields[16] as String?,
       alerted: fields[17] as bool? ?? false,
+      alertBelow: fields[18] as bool? ?? false,
     );
   }
 
   @override
   void write(BinaryWriter writer, InventoryItem obj) {
     writer
-      ..writeByte(18)
+      ..writeByte(19)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -80,7 +81,9 @@ class InventoryItemAdapter extends TypeAdapter<InventoryItem> {
       ..writeByte(16)
       ..write(obj.alertCurrency)
       ..writeByte(17)
-      ..write(obj.alerted);
+      ..write(obj.alerted)
+      ..writeByte(18)
+      ..write(obj.alertBelow);
   }
 
   @override

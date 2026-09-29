@@ -1,11 +1,14 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../models/cs_account.dart';
 import '../../models/cs_rank_enums.dart';
 import '../../providers/accounts_provider.dart';
 import '../../providers/services_providers.dart';
 import '../../providers/settings_provider.dart';
+import '../../services/hive_service.dart';
 import '../../services/steam_stats_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/rank_widgets.dart';
@@ -183,6 +186,10 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
             onSaved: _save,
           ),
           const SizedBox(height: 20),
+          _SectionTitle(icon: Icons.show_chart, title: 'Progreso de rango'),
+          const SizedBox(height: 8),
+          _RankHistoryCard(accountId: account.id),
+          const SizedBox(height: 20),
           _SectionTitle(icon: Icons.public, title: 'Competitivo por mapa'),
           const SizedBox(height: 8),
           Card(
@@ -301,6 +308,27 @@ class _AccountDetailScreenState extends ConsumerState<AccountDetailScreen> {
                 if (_steamStats != null) ...[
                   const SizedBox(height: 16),
                   SteamStatsGrid(stats: _steamStats!),
+                  const SizedBox(height: 16),
+                  const Text('TOP ARMAS',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
+                          fontSize: 11,
+                          color: Colors.white60)),
+                  const SizedBox(height: 8),
+                  SteamWeaponStatsList(
+                    weapons: _steamStats!.weapons,
+                    specialKills: _steamStats!.specialKills,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('MAPAS JUGADOS',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1,
+                          fontSize: 11,
+                          color: Colors.white60)),
+                  const SizedBox(height: 8),
+                  SteamMapStatsList(maps: _steamStats!.maps),
                 ],
               ],
             ),
@@ -625,6 +653,128 @@ class _StatBox extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Gráfico de la evolución del Premier Rating de la cuenta a lo largo del
+/// tiempo, a partir de los snapshots diarios guardados al abrir la app.
+class _RankHistoryCard extends StatelessWidget {
+  const _RankHistoryCard({required this.accountId});
+  final String accountId;
+
+  @override
+  Widget build(BuildContext context) {
+    final snapshots = HiveService.rankSnapshotsBox.values
+        .where((s) => s.accountId == accountId)
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+
+    if (snapshots.length < 2) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF161A20),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.borderStrong),
+        ),
+        child: const Column(
+          children: [
+            Icon(Icons.show_chart, size: 32, color: Colors.white24),
+            SizedBox(height: 8),
+            Text(
+              'Todavía no hay suficientes días registrados. Cada vez que abras la app se guarda el rating de hoy — vuelve en un par de días para ver la evolución.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white38, fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final spots = <FlSpot>[
+      for (var i = 0; i < snapshots.length; i++)
+        FlSpot(i.toDouble(), snapshots[i].premierRating.toDouble()),
+    ];
+    final maxY =
+        spots.map((s) => s.y).fold<double>(0, (a, b) => a > b ? a : b);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 20, 20, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF161A20),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.csOrange.withValues(alpha: 0.3)),
+      ),
+      child: SizedBox(
+        height: 180,
+        child: LineChart(
+          LineChartData(
+            minY: 0,
+            maxY: maxY <= 0 ? 1 : maxY * 1.15,
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              getDrawingHorizontalLine: (_) =>
+                  FlLine(color: AppTheme.borderStrong, strokeWidth: 1),
+            ),
+            borderData: FlBorderData(show: false),
+            titlesData: FlTitlesData(
+              topTitles:
+                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles:
+                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 40,
+                  getTitlesWidget: (value, meta) => Text(
+                    value >= 1000
+                        ? '${(value / 1000).toStringAsFixed(1)}k'
+                        : value.toStringAsFixed(0),
+                    style: const TextStyle(color: Colors.white38, fontSize: 10),
+                  ),
+                ),
+              ),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 24,
+                  interval:
+                      (snapshots.length / 4).clamp(1, 999).roundToDouble(),
+                  getTitlesWidget: (value, meta) {
+                    final i = value.round();
+                    if (i < 0 || i >= snapshots.length) {
+                      return const SizedBox.shrink();
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        DateFormat('dd/MM').format(snapshots[i].date),
+                        style: const TextStyle(
+                            color: Colors.white38, fontSize: 10),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            lineBarsData: [
+              LineChartBarData(
+                spots: spots,
+                isCurved: true,
+                color: AppTheme.csOrange,
+                barWidth: 2.5,
+                dotData: const FlDotData(show: false),
+                belowBarData: BarAreaData(
+                  show: true,
+                  color: AppTheme.csOrange.withValues(alpha: 0.15),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

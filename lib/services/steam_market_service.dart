@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/price_cache_entry.dart';
 import 'hive_service.dart';
@@ -44,6 +45,13 @@ class SteamMarketService {
         )) {
     _dio.options.headers['User-Agent'] = 'cs2_tracker/1.0 (flutter app)';
   }
+
+  /// True cuando la última consulta a Steam no pudo completarse (sin red,
+  /// timeout o HTTP 429 sostenido). Un "not found" (item que no existe con
+  /// ese nombre) SÍ es una respuesta válida de Steam, así que no cuenta como
+  /// offline. La UI puede escuchar esto para mostrar un aviso de "sin conexión,
+  /// mostrando precios en caché".
+  final ValueNotifier<bool> offline = ValueNotifier<bool>(false);
 
   final Dio _dio;
   static const String _priceBase =
@@ -205,9 +213,14 @@ class SteamMarketService {
     }
     anySuccess = eurStatus == PriceStatus.fresh || usdStatus == PriceStatus.fresh;
 
+    // Éxito o "no encontrado" son ambos respuestas reales de Steam: prueban
+    // que hay conexión, aunque el segundo caso no encuentre el item.
+    if (anySuccess || anyNotFound) offline.value = false;
+
     // HTTP 429 con caché previa: actualizamos marca de fallo pero conservamos
     // el último precio conocido para no mostrar guiones a la primera.
     if (anyRateLimit && !anySuccess && cached != null) {
+      offline.value = true;
       final updated = PriceCacheEntry(
         marketHashName: key,
         priceEur: cached.priceEur,
@@ -229,6 +242,7 @@ class SteamMarketService {
     if (!anySuccess) {
       final newStatus =
           anyNotFound ? PriceStatus.notFound : PriceStatus.failed;
+      if (newStatus == PriceStatus.failed) offline.value = true;
       final failed = PriceCacheEntry(
         marketHashName: key,
         priceEur: cached?.priceEur ?? 0,

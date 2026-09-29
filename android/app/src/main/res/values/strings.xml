@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_inventory_short">Inventario</string>
+    <string name="shortcut_inventory_long">Ver inventario general</string>
+    <string name="shortcut_drop_short">Registrar drop</string>
+    <string name="shortcut_drop_long">Registrar drop semanal</string>
+</resources>

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/accounts_provider.dart';
 import '../../providers/services_providers.dart';
 import '../../services/backup_service.dart';
+import '../../services/shortcuts_service.dart';
 import '../../services/stats_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/account_card.dart';
@@ -13,10 +14,12 @@ import '../../widgets/cut_corner_card.dart';
 import '../../widgets/section_label.dart';
 import '../../widgets/update_dialog.dart';
 import '../account/account_detail_screen.dart';
+import '../compare/skin_compare_screen.dart';
 import '../drop/register_drop_dialog.dart';
 import '../inventory/inventory_screen.dart';
 import '../settings/settings_screen.dart';
 import '../stats/stats_screen.dart';
+import '../watchlist/watchlist_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -29,6 +32,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    ShortcutsService.listen((s) {
+      if (mounted) _handleShortcut(s);
+    });
     // Verificar reset al abrir la app.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await ref.read(orchestratorProvider).runStartupCheck();
@@ -41,6 +47,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       } catch (_) {}
 
       try {
+        await StatsService.recordDailyRankSnapshotsIfNeeded();
+      } catch (_) {}
+
+      try {
         await BackupService().autoBackupIfNeeded();
       } catch (_) {}
 
@@ -48,7 +58,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (update != null && mounted) {
         showUpdateDialog(context, update);
       }
+
+      final shortcut = await ShortcutsService.getInitialShortcut();
+      if (shortcut != null && mounted) _handleShortcut(shortcut);
     });
+  }
+
+  /// Navega a la pantalla correspondiente al acceso directo del icono. Para
+  /// "Registrar drop": si hay exactamente una cuenta con drop pendiente, la
+  /// abre directamente; si hay varias (o ninguna) se queda en la pantalla
+  /// principal, donde ya se ven todas.
+  void _handleShortcut(String shortcut) {
+    switch (shortcut) {
+      case 'inventory':
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const InventoryScreen()),
+        );
+        break;
+      case 'register_drop':
+        final pending = ref
+            .read(accountsProvider)
+            .where((a) => !a.dropObtainedThisWeek && !a.dropMissedThisWeek)
+            .toList();
+        if (pending.length == 1) {
+          RegisterDropDialog.show(context, account: pending.first);
+        }
+        break;
+    }
   }
 
   @override
@@ -110,11 +146,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             },
           ),
           IconButton(
+            icon: const Icon(Icons.price_check, size: 22),
+            tooltip: 'Comparador de precios',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SkinCompareScreen()),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.inventory_2_outlined, size: 22),
             tooltip: 'Inventario General',
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const InventoryScreen()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.visibility_outlined, size: 22),
+            tooltip: 'Lista de seguimiento',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const WatchlistScreen()),
               );
             },
           ),
