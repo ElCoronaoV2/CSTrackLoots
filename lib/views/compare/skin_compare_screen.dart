@@ -358,6 +358,7 @@ class _PriceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final v = value;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
@@ -371,7 +372,7 @@ class _PriceTile extends StatelessWidget {
           Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
           const SizedBox(height: 2),
           Text(
-            value == null ? '—' : formatPrice(value, currency),
+            v == null ? '—' : formatPrice(v, currency),
             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
           ),
         ],
