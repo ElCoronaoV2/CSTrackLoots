@@ -18,6 +18,7 @@ import '../drop/register_drop_dialog.dart';
 import '../inventory/inventory_screen.dart';
 import '../settings/settings_screen.dart';
 import '../stats/stats_screen.dart';
+import '../watchlist/watchlist_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -125,6 +126,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const InventoryScreen()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.visibility_outlined, size: 22),
+            tooltip: 'Lista de seguimiento',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const WatchlistScreen()),
               );
             },
           ),
