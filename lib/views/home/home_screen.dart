@@ -13,6 +13,7 @@ import '../../widgets/cut_corner_card.dart';
 import '../../widgets/section_label.dart';
 import '../../widgets/update_dialog.dart';
 import '../account/account_detail_screen.dart';
+import '../compare/skin_compare_screen.dart';
 import '../drop/register_drop_dialog.dart';
 import '../inventory/inventory_screen.dart';
 import '../settings/settings_screen.dart';
@@ -106,6 +107,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const StatsScreen()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.price_check, size: 22),
+            tooltip: 'Comparador de precios',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SkinCompareScreen()),
               );
             },
           ),
