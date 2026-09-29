@@ -224,7 +224,7 @@ class _SkinCompareScreenState extends ConsumerState<SkinCompareScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'Float ${_typedFloat!.toStringAsFixed(4)} ≈ ${_suggestedWear!.label} (rango estándar; cada skin puede variar el suyo).',
+                  'Float ${_typedFloat!.toStringAsFixed(4)} ≈ ${_suggestedWear!.labelEs} (rango estándar; cada skin puede variar el suyo).',
                   style: const TextStyle(color: AppTheme.csOrange, fontSize: 11),
                 ),
               ),
@@ -309,7 +309,7 @@ class _PriceRowCard extends StatelessWidget {
           Row(
             children: [
               Text(
-                row.wear?.label ?? 'Precio',
+                row.wear?.labelEs ?? 'Precio',
                 style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
               ),
               if (highlighted) ...[

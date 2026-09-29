@@ -3,12 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 
+import '../models/cs_account.dart';
 import '../models/inventory_item.dart';
+import '../providers/accounts_provider.dart';
 import '../providers/inventory_provider.dart';
 import '../providers/services_providers.dart';
 import '../services/hive_service.dart';
 import '../services/skinport_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/es_names.dart';
 import '../utils/formatters.dart';
 import 'item_icons.dart';
 
@@ -111,7 +114,7 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
                     ],
                     Flexible(
                       child: Text(
-                        item.itemName,
+                        displayItemName(item.itemName, item.category),
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
                           color: item.sold ? Colors.white54 : Colors.white,
@@ -169,8 +172,8 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
                       _MiniChip(
                         icon: Icons.blur_circular,
                         text: item.floatValue != null
-                            ? '${item.wear!.shortLabel} ${item.floatValue!.toStringAsFixed(4)}'
-                            : item.wear!.shortLabel,
+                            ? '${item.wear!.labelEs} ${item.floatValue!.toStringAsFixed(4)}'
+                            : item.wear!.labelEs,
                       ),
                     if (item.wear == null && item.floatValue != null)
                       _MiniChip(
@@ -226,6 +229,17 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
                           const BoxConstraints(minWidth: 32, minHeight: 32),
                       visualDensity: VisualDensity.compact,
                     ),
+                    if (!item.sold)
+                      IconButton(
+                        tooltip: 'Transferir a otra cuenta',
+                        onPressed: () => _transferItem(context),
+                        icon: const Icon(Icons.swap_horiz,
+                            size: 18, color: Colors.white54),
+                        padding: EdgeInsets.zero,
+                        constraints:
+                            const BoxConstraints(minWidth: 32, minHeight: 32),
+                        visualDensity: VisualDensity.compact,
+                      ),
                     TextButton.icon(
                       onPressed: () => _confirmSell(context),
                       style: TextButton.styleFrom(
@@ -318,7 +332,9 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
             children: [
               const Icon(Icons.sell_outlined, color: Color(0xFFF59E0B)),
               const SizedBox(width: 8),
-              Expanded(child: Text('Vender "${item.itemName}"')),
+              Expanded(
+                  child: Text(
+                      'Vender "${displayItemName(item.itemName, item.category)}"')),
             ],
           ),
           content: Column(
@@ -405,7 +421,7 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
       builder: (ctx) => AlertDialog(
         title: const Text('¿Eliminar item?'),
         content: Text(
-          'Se eliminará "${widget.item.itemName}" del inventario general. Esta acción no se puede deshacer.',
+          'Se eliminará "${displayItemName(widget.item.itemName, widget.item.category)}" del inventario general. Esta acción no se puede deshacer.',
         ),
         actions: [
           TextButton(
@@ -459,7 +475,7 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                item.itemName,
+                displayItemName(item.itemName, item.category),
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 14),
@@ -512,6 +528,154 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
     );
   }
 
+  Future<void> _transferItem(BuildContext context) async {
+    final item = widget.item;
+    final accounts = ref
+        .read(accountsProvider)
+        .where((a) => a.id != item.accountId)
+        .toList();
+    final messenger = ScaffoldMessenger.of(context);
+    if (accounts.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('No hay otra cuenta a la que transferir este item.'),
+        ),
+      );
+      return;
+    }
+
+    CsAccount? target = accounts.first;
+    final available = item.availableQuantity;
+    var qty = available;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Row(
+            children: const [
+              Icon(Icons.swap_horiz, color: Color(0xFFF59E0B)),
+              SizedBox(width: 8),
+              Expanded(child: Text('Transferir a otra cuenta')),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '"${displayItemName(item.itemName, item.category)}" se quitará del inventario de "${item.accountName}" y pasará al de la cuenta que elijas.',
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              const Text('Cuenta destino',
+                  style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white70)),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF161A20),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF2A313B)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<CsAccount>(
+                    value: target,
+                    isExpanded: true,
+                    dropdownColor: const Color(0xFF161A20),
+                    icon: const Icon(Icons.expand_more, color: Colors.white54),
+                    items: accounts
+                        .map((a) => DropdownMenuItem<CsAccount>(
+                              value: a,
+                              child: Text(a.alias),
+                            ))
+                        .toList(),
+                    onChanged: (v) => setDialogState(() => target = v),
+                  ),
+                ),
+              ),
+              if (available > 1) ...[
+                const SizedBox(height: 14),
+                const Text('Cantidad a transferir',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white70)),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: qty > 1
+                          ? () => setDialogState(() => qty--)
+                          : null,
+                      icon: const Icon(Icons.remove_circle_outline,
+                          color: Color(0xFFF59E0B)),
+                    ),
+                    Container(
+                      constraints: const BoxConstraints(minWidth: 56),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF161A20),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF2A313B)),
+                      ),
+                      child: Text(
+                        'x$qty',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 16),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: qty < available
+                          ? () => setDialogState(() => qty++)
+                          : null,
+                      icon: const Icon(Icons.add_circle_outline,
+                          color: Color(0xFFF59E0B)),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('de $available disponibles',
+                        style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                  ],
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: target == null ? null : () => Navigator.of(ctx).pop(true),
+              child: const Text('TRANSFERIR'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || target == null || !mounted) return;
+
+    final ok = await ref.read(inventoryProvider.notifier).transferItem(
+          item.id,
+          toAccount: target!,
+          quantity: qty,
+        );
+    if (!mounted) return;
+    messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: ok ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+        content: Text(
+          ok
+              ? 'Transferido a "${target!.alias}".'
+              : 'No se pudo transferir el item.',
+          style: TextStyle(
+            color: ok ? Colors.black : Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _setAlert(BuildContext context) async {
     final item = widget.item;
     final current =
@@ -536,7 +700,7 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Te avisamos con una notificación cuando "${item.itemName}" cruce este precio. Déjalo vacío para quitar la alerta.',
+                'Te avisamos con una notificación cuando "${displayItemName(item.itemName, item.category)}" cruce este precio. Déjalo vacío para quitar la alerta.',
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
               const SizedBox(height: 12),

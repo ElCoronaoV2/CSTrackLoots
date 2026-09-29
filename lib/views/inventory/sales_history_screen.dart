@@ -7,6 +7,7 @@ import '../../models/sale_record.dart';
 import '../../providers/inventory_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/es_names.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/background_pattern.dart';
 import '../../widgets/cut_corner_card.dart';
@@ -229,7 +230,7 @@ class _SaleTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  sale.itemName,
+                  displayItemName(sale.itemName, cat),
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,

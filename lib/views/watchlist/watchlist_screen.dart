@@ -8,6 +8,7 @@ import '../../providers/settings_provider.dart';
 import '../../providers/watchlist_provider.dart';
 import '../../services/hive_service.dart' show SeedItems;
 import '../../theme/app_theme.dart';
+import '../../utils/es_names.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/background_pattern.dart';
 import '../../widgets/cut_corner_card.dart';
@@ -185,7 +186,7 @@ class _WatchlistTile extends ConsumerWidget {
                     ],
                     Flexible(
                       child: Text(
-                        item.itemName,
+                        displayItemName(item.itemName, item.category),
                         style: const TextStyle(
                             fontWeight: FontWeight.w700, color: Colors.white),
                         maxLines: 2,
@@ -202,7 +203,7 @@ class _WatchlistTile extends ConsumerWidget {
                     _MiniChip(icon: Icons.category_outlined, text: item.category.label, color: color),
                     _MiniChip(icon: Icons.event_outlined, text: dateStr),
                     if (item.wear != null)
-                      _MiniChip(icon: Icons.blur_circular, text: item.wear!.shortLabel),
+                      _MiniChip(icon: Icons.blur_circular, text: item.wear!.labelEs),
                   ],
                 ),
               ],
@@ -267,7 +268,8 @@ class _WatchlistTile extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('¿Dejar de vigilar?'),
-        content: Text('Se quitará "${item.itemName}" de la lista de seguimiento.'),
+        content: Text(
+            'Se quitará "${displayItemName(item.itemName, item.category)}" de la lista de seguimiento.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -308,7 +310,7 @@ class _WatchlistTile extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Te avisamos con una notificación cuando "${item.itemName}" cruce este precio. Déjalo vacío para quitar la alerta.',
+                'Te avisamos con una notificación cuando "${displayItemName(item.itemName, item.category)}" cruce este precio. Déjalo vacío para quitar la alerta.',
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
               const SizedBox(height: 12),
@@ -558,7 +560,7 @@ class _AddWatchlistDialogState extends ConsumerState<_AddWatchlistDialog> {
                     ),
                     ...SkinWear.values.map(
                       (w) => ChoiceChip(
-                        label: Text(w.shortLabel),
+                        label: Text(w.labelEs),
                         selected: _wear == w,
                         onSelected: (_) => setState(() => _wear = w),
                       ),
