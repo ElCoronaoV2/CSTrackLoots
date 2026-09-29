@@ -12,6 +12,7 @@ import '../../utils/formatters.dart';
 import '../../widgets/background_pattern.dart';
 import '../../widgets/cut_corner_card.dart';
 import '../../widgets/item_icons.dart';
+import '../../widgets/offline_banner.dart';
 
 /// Lista de seguimiento: items que el usuario NO tiene pero quiere vigilar
 /// (por ejemplo antes de comprarlos, o para saber si merece la pena volver
@@ -74,9 +75,10 @@ class WatchlistScreen extends ConsumerWidget {
               )
             : ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-                children: items
-                    .map((it) => _WatchlistTile(item: it, currency: currency))
-                    .toList(),
+                children: [
+                  const OfflineBanner(),
+                  ...items.map((it) => _WatchlistTile(item: it, currency: currency)),
+                ],
               ),
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -289,46 +291,64 @@ class _WatchlistTile extends ConsumerWidget {
     final ctrl = TextEditingController(
       text: current != null ? current.toStringAsFixed(2) : '',
     );
+    var below = item.alertBelow;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: const [
-            Icon(Icons.notifications_active_outlined, color: Color(0xFFF59E0B)),
-            SizedBox(width: 8),
-            Expanded(child: Text('Alerta de precio')),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Te avisamos con una notificación cuando "${item.itemName}" alcance este precio o más. Déjalo vacío para quitar la alerta.',
-              style: const TextStyle(color: Colors.white70, fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ctrl,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                labelText: 'Precio ($currency)',
-                prefixIcon: Icon(currency == 'USD' ? Icons.attach_money : Icons.euro),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Row(
+            children: const [
+              Icon(Icons.notifications_active_outlined, color: Color(0xFFF59E0B)),
+              SizedBox(width: 8),
+              Expanded(child: Text('Alerta de precio')),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Te avisamos con una notificación cuando "${item.itemName}" cruce este precio. Déjalo vacío para quitar la alerta.',
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
+              const SizedBox(height: 12),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(
+                      value: false,
+                      label: Text('Sube a'),
+                      icon: Icon(Icons.trending_up, size: 16)),
+                  ButtonSegment(
+                      value: true,
+                      label: Text('Baja a'),
+                      icon: Icon(Icons.trending_down, size: 16)),
+                ],
+                selected: {below},
+                onSelectionChanged: (s) => setDialogState(() => below = s.first),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Precio ($currency)',
+                  prefixIcon: Icon(currency == 'USD' ? Icons.attach_money : Icons.euro),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Guardar'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Guardar'),
-          ),
-        ],
       ),
     );
     final text = ctrl.text;
@@ -341,6 +361,7 @@ class _WatchlistTile extends ConsumerWidget {
           item.id,
           currency: currency,
           threshold: value,
+          below: below,
         );
   }
 }

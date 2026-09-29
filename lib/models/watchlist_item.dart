@@ -43,10 +43,15 @@ class WatchlistItem extends HiveObject {
   String? alertCurrency;
 
   /// True si ya se notificó para el umbral actual (evita repetir la
-  /// notificación en cada refresco). Se resetea si el precio vuelve a bajar
-  /// del umbral, permitiendo re-alertar más tarde.
+  /// notificación en cada refresco). Se resetea si el precio vuelve a
+  /// cruzar el umbral en sentido contrario, permitiendo re-alertar más tarde.
   @HiveField(10)
   bool alerted;
+
+  /// True = avisar cuando el precio BAJE de [alertThreshold] (para comprar
+  /// barato). False (por defecto) = avisar cuando SUBA.
+  @HiveField(11)
+  bool alertBelow;
 
   WatchlistItem({
     required this.id,
@@ -60,6 +65,7 @@ class WatchlistItem extends HiveObject {
     this.alertThreshold,
     this.alertCurrency,
     this.alerted = false,
+    this.alertBelow = false,
   }) : addedAt = addedAt ?? DateTime.now();
 
   bool get supportsWearDetails => category.supportsWearDetails;

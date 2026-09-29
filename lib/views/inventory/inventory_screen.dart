@@ -10,6 +10,7 @@ import '../../utils/formatters.dart';
 import '../../widgets/background_pattern.dart';
 import '../../widgets/cut_corner_card.dart';
 import '../../widgets/inventory_item_tile.dart';
+import '../../widgets/offline_banner.dart';
 import '../../widgets/section_label.dart';
 import 'add_item_dialog.dart';
 import 'sales_history_screen.dart';
@@ -47,11 +48,69 @@ Future<void> _refreshAll(BuildContext context, WidgetRef ref) async {
   );
 }
 
-class InventoryScreen extends ConsumerWidget {
+class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<InventoryScreen> createState() => _InventoryScreenState();
+}
+
+class _InventoryScreenState extends ConsumerState<InventoryScreen> {
+  bool _selectionMode = false;
+  final Set<String> _selected = {};
+
+  void _toggleSelectionMode() {
+    setState(() {
+      _selectionMode = !_selectionMode;
+      _selected.clear();
+    });
+  }
+
+  Future<void> _sellSelected() async {
+    if (_selected.isEmpty) return;
+    final count = _selected.length;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Vender seleccionados?'),
+        content: Text(
+          'Se venderán las $count unidades seleccionadas al precio actual de cada una. Esta acción no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('VENDER'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final sold = await ref
+        .read(inventoryProvider.notifier)
+        .sellItemsFully(_selected.toList());
+    if (!mounted) return;
+    setState(() {
+      _selectionMode = false;
+      _selected.clear();
+    });
+    messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFFF59E0B),
+        content: Text(
+          'Vendidos $sold items.',
+          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final summary = ref.watch(inventorySummaryProvider);
     final filtered = ref.watch(filteredInventoryProvider);
     final filter = ref.watch(inventoryFilterProvider);
@@ -63,14 +122,18 @@ class InventoryScreen extends ConsumerWidget {
         appBar: AppBar(
         backgroundColor: AppTheme.bgSurface,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, size: 22),
-          onPressed: () => Navigator.of(context).pop(),
+          icon: Icon(_selectionMode ? Icons.close : Icons.arrow_back, size: 22),
+          onPressed: _selectionMode
+              ? _toggleSelectionMode
+              : () => Navigator.of(context).pop(),
         ),
         title: Row(
           children: [
-            const Text(
-              'INVENTARIO GENERAL',
-              style: TextStyle(
+            Text(
+              _selectionMode
+                  ? '${_selected.length} SELECCIONADOS'
+                  : 'INVENTARIO GENERAL',
+              style: const TextStyle(
                 fontWeight: FontWeight.w900,
                 color: Colors.white,
                 fontSize: 18,
@@ -78,20 +141,27 @@ class InventoryScreen extends ConsumerWidget {
               ),
             ),
             const Spacer(),
-            IconButton(
-              tooltip: 'Refrescar precios',
-              icon: const Icon(Icons.refresh, size: 22),
-              onPressed: () => _refreshAll(context, ref),
-            ),
-            IconButton(
-              tooltip: 'Historial de ventas',
-              icon: const Icon(Icons.receipt_long_outlined, size: 22),
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const SalesHistoryScreen(),
+            if (!_selectionMode) ...[
+              IconButton(
+                tooltip: 'Venta rápida por lote',
+                icon: const Icon(Icons.checklist, size: 22),
+                onPressed: _toggleSelectionMode,
+              ),
+              IconButton(
+                tooltip: 'Refrescar precios',
+                icon: const Icon(Icons.refresh, size: 22),
+                onPressed: () => _refreshAll(context, ref),
+              ),
+              IconButton(
+                tooltip: 'Historial de ventas',
+                icon: const Icon(Icons.receipt_long_outlined, size: 22),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const SalesHistoryScreen(),
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -99,28 +169,45 @@ class InventoryScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
           children: [
-            _SummaryCard(
-              totalEur: summary.totalEur,
-              totalUsd: summary.totalUsd,
-              currency: settings.preferredCurrency,
-              numCases: summary.numCases,
-              numSkins: summary.numSkins,
-              numGrafitis: summary.numGrafitis,
-              numKnives: summary.numKnives,
-              numGloves: summary.numGloves,
-              numOther: summary.numOther,
-              totalActive: summary.totalActive,
-            ),
-            const SizedBox(height: 18),
-            const SectionLabel('Todas las cuentas'),
-            const SizedBox(height: 12),
-            _FiltersBar(
-              filter: filter,
-              accounts: accounts,
-              onChange: (f) =>
-                  ref.read(inventoryFilterProvider.notifier).state = f,
-            ),
-            const SizedBox(height: 14),
+            const OfflineBanner(),
+            if (!_selectionMode) ...[
+              _SummaryCard(
+                totalEur: summary.totalEur,
+                totalUsd: summary.totalUsd,
+                currency: settings.preferredCurrency,
+                numCases: summary.numCases,
+                numSkins: summary.numSkins,
+                numGrafitis: summary.numGrafitis,
+                numKnives: summary.numKnives,
+                numGloves: summary.numGloves,
+                numOther: summary.numOther,
+                totalActive: summary.totalActive,
+              ),
+              const SizedBox(height: 18),
+              const SectionLabel('Todas las cuentas'),
+              const SizedBox(height: 12),
+              _FiltersBar(
+                filter: filter,
+                accounts: accounts,
+                onChange: (f) =>
+                    ref.read(inventoryFilterProvider.notifier).state = f,
+              ),
+              const SizedBox(height: 14),
+            ] else ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: AppTheme.csOrange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.csOrange.withValues(alpha: 0.4)),
+                ),
+                child: const Text(
+                  'Toca los items que quieras vender en bloque y pulsa "Vender seleccionados" abajo.',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ),
+            ],
             if (filtered.isEmpty)
               CutCornerCard(
                 color: AppTheme.bgCard,
@@ -150,19 +237,39 @@ class InventoryScreen extends ConsumerWidget {
                 currency: settings.preferredCurrency,
                 onQuantitySold: () {},
                 onDelete: () {},
+                selectionMode: _selectionMode,
+                selected: _selected.contains(it.id),
+                onSelectedChanged: (v) => setState(() {
+                  if (v) {
+                    _selected.add(it.id);
+                  } else {
+                    _selected.remove(it.id);
+                  }
+                }),
               ),
             ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppTheme.csOrange,
-        foregroundColor: Colors.black,
-        onPressed: () => AddItemDialog.show(context),
-        icon: const Icon(Icons.add),
-        label: const Text('AÑADIR ITEM',
-            style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
-      ),
+      floatingActionButton: _selectionMode
+          ? FloatingActionButton.extended(
+              backgroundColor: _selected.isEmpty
+                  ? Colors.white24
+                  : const Color(0xFFF59E0B),
+              foregroundColor: Colors.black,
+              onPressed: _selected.isEmpty ? null : _sellSelected,
+              icon: const Icon(Icons.sell_outlined),
+              label: Text('VENDER SELECCIONADOS (${_selected.length})',
+                  style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
+            )
+          : FloatingActionButton.extended(
+              backgroundColor: AppTheme.csOrange,
+              foregroundColor: Colors.black,
+              onPressed: () => AddItemDialog.show(context),
+              icon: const Icon(Icons.add),
+              label: const Text('AÑADIR ITEM',
+                  style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
+            ),
     );
   }
 }

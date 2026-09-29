@@ -60,16 +60,19 @@ class WatchlistNotifier extends StateNotifier<List<WatchlistItem>> {
   }
 
   /// Fija (o quita, con `threshold: null`) el umbral de alerta de precio.
+  /// [below] = true avisa cuando el precio BAJE del umbral en vez de subir.
   /// Resetea `alerted` para que un umbral nuevo pueda volver a disparar.
   Future<void> setAlertThreshold(
     String id, {
     required String currency,
     required double? threshold,
+    bool below = false,
   }) async {
     final item = HiveService.watchlistBox.get(id);
     if (item == null) return;
     item.alertThreshold = threshold;
     item.alertCurrency = currency;
+    item.alertBelow = below;
     item.alerted = false;
     try {
       await item.save();
@@ -82,7 +85,8 @@ class WatchlistNotifier extends StateNotifier<List<WatchlistItem>> {
     if (threshold == null) return;
     final currency = item.alertCurrency ?? 'EUR';
     final price = currency == 'USD' ? item.priceUsd : item.priceEur;
-    if (price >= threshold) {
+    final crossed = item.alertBelow ? price <= threshold : price >= threshold;
+    if (crossed) {
       if (!item.alerted) {
         item.alerted = true;
         try {
@@ -94,6 +98,7 @@ class WatchlistNotifier extends StateNotifier<List<WatchlistItem>> {
                 itemName: item.itemName,
                 price: price,
                 currency: currency,
+                below: item.alertBelow,
               );
         } catch (_) {}
       }

@@ -28,13 +28,14 @@ class WatchlistItemAdapter extends TypeAdapter<WatchlistItem> {
       alertThreshold: fields[8] as double?,
       alertCurrency: fields[9] as String?,
       alerted: fields[10] as bool,
+      alertBelow: fields[11] as bool? ?? false,
     );
   }
 
   @override
   void write(BinaryWriter writer, WatchlistItem obj) {
     writer
-      ..writeByte(11)
+      ..writeByte(12)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -56,7 +57,9 @@ class WatchlistItemAdapter extends TypeAdapter<WatchlistItem> {
       ..writeByte(9)
       ..write(obj.alertCurrency)
       ..writeByte(10)
-      ..write(obj.alerted);
+      ..write(obj.alerted)
+      ..writeByte(11)
+      ..write(obj.alertBelow);
   }
 
   @override

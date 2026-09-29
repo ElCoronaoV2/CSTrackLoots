@@ -202,18 +202,21 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
   }
 
   /// Fija (o quita, con `threshold: null`) el umbral de alerta de precio
-  /// de un item, en la moneda indicada. Resetea `alerted` para que un
-  /// umbral nuevo (o el mismo tras haber bajado el precio) pueda volver a
-  /// disparar la notificación.
+  /// de un item, en la moneda indicada. [below] = true avisa cuando el
+  /// precio BAJE del umbral en vez de cuando suba. Resetea `alerted` para
+  /// que un umbral nuevo (o el mismo tras cruzarlo en sentido contrario)
+  /// pueda volver a disparar la notificación.
   Future<void> setAlertThreshold(
     String itemId, {
     required String currency,
     required double? threshold,
+    bool below = false,
   }) async {
     final item = HiveService.inventoryBox.get(itemId);
     if (item == null) return;
     item.alertThreshold = threshold;
     item.alertCurrency = currency;
+    item.alertBelow = below;
     item.alerted = false;
     try {
       await item.save();
@@ -221,16 +224,18 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
     _load();
   }
 
-  /// Comprueba si el precio actual de `item` cruza su umbral de alerta y,
-  /// si es así (y no se había notificado ya), dispara una notificación
-  /// local. Si el precio vuelve a bajar del umbral, resetea `alerted` para
-  /// permitir re-alertar en una subida futura.
+  /// Comprueba si el precio actual de `item` cruza su umbral de alerta
+  /// (por arriba o por abajo, según [InventoryItem.alertBelow]) y, si es
+  /// así (y no se había notificado ya), dispara una notificación local. Si
+  /// el precio vuelve a cruzar en sentido contrario, resetea `alerted`
+  /// para permitir re-alertar más tarde.
   Future<void> _checkPriceAlert(InventoryItem item) async {
     final threshold = item.alertThreshold;
     if (threshold == null) return;
     final currency = item.alertCurrency ?? 'EUR';
     final price = currency == 'USD' ? item.priceUsd : item.priceEur;
-    if (price >= threshold) {
+    final crossed = item.alertBelow ? price <= threshold : price >= threshold;
+    if (crossed) {
       if (!item.alerted) {
         item.alerted = true;
         try {
@@ -242,6 +247,7 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
                 itemName: item.itemName,
                 price: price,
                 currency: currency,
+                below: item.alertBelow,
               );
         } catch (_) {}
       }
@@ -336,6 +342,20 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
 
     _load();
     return item.quantity;
+  }
+
+  /// Vende TODAS las unidades disponibles de cada item de `itemIds` (venta
+  /// rápida por lote). Ignora silenciosamente los que ya estén vendidos o
+  /// no existan. Devuelve cuántos items se vendieron.
+  Future<int> sellItemsFully(List<String> itemIds) async {
+    var sold = 0;
+    for (final id in itemIds) {
+      final item = HiveService.inventoryBox.get(id);
+      if (item == null || item.sold || item.availableQuantity <= 0) continue;
+      final result = await sellQuantity(id, item.availableQuantity);
+      if (result >= 0) sold++;
+    }
+    return sold;
   }
 
   /// Vuelve a poner unidades como disponibles (operación inversa de sellQuantity).

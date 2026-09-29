@@ -160,9 +160,16 @@ class InventoryItem extends HiveObject {
 
   /// True si ya se notificó para el umbral actual (evita repetir la
   /// notificación en cada refresco de precio). Se resetea a false si el
-  /// precio vuelve a bajar del umbral, permitiendo re-alertar más tarde.
+  /// precio vuelve a cruzar el umbral en sentido contrario, permitiendo
+  /// re-alertar más tarde.
   @HiveField(17)
   bool alerted;
+
+  /// True = avisar cuando el precio BAJE de [alertThreshold] (para comprar
+  /// barato o vender antes de que siga cayendo). False (por defecto) =
+  /// avisar cuando SUBA, el comportamiento original.
+  @HiveField(18)
+  bool alertBelow;
 
   InventoryItem({
     required this.id,
@@ -183,6 +190,7 @@ class InventoryItem extends HiveObject {
     this.alertThreshold,
     this.alertCurrency,
     this.alerted = false,
+    this.alertBelow = false,
   })  : assert(quantity >= 0, 'quantity no puede ser negativa'),
         assert(floatValue == null || (floatValue >= 0.0 && floatValue <= 1.0),
             'floatValue debe estar entre 0.0 y 1.0'),

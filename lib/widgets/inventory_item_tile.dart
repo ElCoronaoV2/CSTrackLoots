@@ -22,12 +22,21 @@ class InventoryItemTile extends ConsumerStatefulWidget {
     required this.currency,
     required this.onQuantitySold,
     required this.onDelete,
+    this.selectionMode = false,
+    this.selected = false,
+    this.onSelectedChanged,
   });
 
   final InventoryItem item;
   final String currency;
   final VoidCallback onQuantitySold;
   final VoidCallback onDelete;
+
+  /// Modo "venta rápida por lote": si está activo, la tile muestra un
+  /// checkbox y tocarla selecciona/deselecciona en vez de hacer nada.
+  final bool selectionMode;
+  final bool selected;
+  final ValueChanged<bool>? onSelectedChanged;
 
   @override
   ConsumerState<InventoryItemTile> createState() => _InventoryItemTileState();
@@ -43,18 +52,31 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
     final totalPrice = unitPrice * item.quantity;
     final dateStr = DateFormat('dd/MM/yyyy').format(item.obtainedAt);
 
-    return Container(
+    final tile = Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: item.sold ? const Color(0xFF14171C) : const Color(0xFF161A20),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: item.sold ? const Color(0xFF1F252D) : color.withValues(alpha: 0.35),
+          color: widget.selected
+              ? AppTheme.csOrange
+              : (item.sold ? const Color(0xFF1F252D) : color.withValues(alpha: 0.35)),
+          width: widget.selected ? 2 : 1,
         ),
       ),
       child: Row(
         children: [
+          if (widget.selectionMode) ...[
+            Checkbox(
+              value: widget.selected,
+              onChanged: item.sold
+                  ? null
+                  : (v) => widget.onSelectedChanged?.call(v ?? false),
+              activeColor: AppTheme.csOrange,
+            ),
+            const SizedBox(width: 4),
+          ],
           _ItemImageBox(
             itemName: item.itemName,
             fallbackIcon: icon,
@@ -189,78 +211,89 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
                   fontSize: 16,
                 ),
               ),
-              const SizedBox(height: 6),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    tooltip: 'Comparar con Skinport',
-                    onPressed: () => _comparePrices(context),
-                    icon: const Icon(Icons.compare_arrows,
-                        size: 18, color: Colors.white54),
-                    padding: EdgeInsets.zero,
-                    constraints:
-                        const BoxConstraints(minWidth: 32, minHeight: 32),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  TextButton.icon(
-                    onPressed: () => _confirmSell(context),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      minimumSize: const Size(0, 0),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    icon: Icon(
-                      item.sold ? Icons.undo : Icons.sell_outlined,
-                      size: 16,
-                      color: item.sold ? AppTheme.csCyan : Colors.white70,
-                    ),
-                    label: Text(
-                      item.sold ? 'Devolver' : 'Vender',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color:
-                            item.sold ? AppTheme.csCyan : Colors.white70,
-                      ),
-                    ),
-                  ),
-                  if (!item.sold)
+              if (!widget.selectionMode) ...[
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     IconButton(
-                      tooltip: item.alertThreshold != null
-                          ? 'Alerta de precio activa'
-                          : 'Poner alerta de precio',
-                      onPressed: () => _setAlert(context),
-                      icon: Icon(
-                        item.alertThreshold != null
-                            ? Icons.notifications_active
-                            : Icons.notifications_none,
-                        size: 18,
-                        color: item.alertThreshold != null
-                            ? AppTheme.csOrange
-                            : Colors.white54,
-                      ),
+                      tooltip: 'Comparar con Skinport',
+                      onPressed: () => _comparePrices(context),
+                      icon: const Icon(Icons.compare_arrows,
+                          size: 18, color: Colors.white54),
                       padding: EdgeInsets.zero,
                       constraints:
                           const BoxConstraints(minWidth: 32, minHeight: 32),
                       visualDensity: VisualDensity.compact,
                     ),
-                  IconButton(
-                    tooltip: 'Eliminar del inventario',
-                    onPressed: () => _confirmDelete(context),
-                    icon: const Icon(Icons.delete_outline,
-                        size: 18, color: Colors.white54),
-                    padding: EdgeInsets.zero,
-                    constraints:
-                        const BoxConstraints(minWidth: 32, minHeight: 32),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ],
-              ),
+                    TextButton.icon(
+                      onPressed: () => _confirmSell(context),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        minimumSize: const Size(0, 0),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      icon: Icon(
+                        item.sold ? Icons.undo : Icons.sell_outlined,
+                        size: 16,
+                        color: item.sold ? AppTheme.csCyan : Colors.white70,
+                      ),
+                      label: Text(
+                        item.sold ? 'Devolver' : 'Vender',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color:
+                              item.sold ? AppTheme.csCyan : Colors.white70,
+                        ),
+                      ),
+                    ),
+                    if (!item.sold)
+                      IconButton(
+                        tooltip: item.alertThreshold != null
+                            ? 'Alerta de precio activa'
+                            : 'Poner alerta de precio',
+                        onPressed: () => _setAlert(context),
+                        icon: Icon(
+                          item.alertThreshold != null
+                              ? Icons.notifications_active
+                              : Icons.notifications_none,
+                          size: 18,
+                          color: item.alertThreshold != null
+                              ? AppTheme.csOrange
+                              : Colors.white54,
+                        ),
+                        padding: EdgeInsets.zero,
+                        constraints:
+                            const BoxConstraints(minWidth: 32, minHeight: 32),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    IconButton(
+                      tooltip: 'Eliminar del inventario',
+                      onPressed: () => _confirmDelete(context),
+                      icon: const Icon(Icons.delete_outline,
+                          size: 18, color: Colors.white54),
+                      padding: EdgeInsets.zero,
+                      constraints:
+                          const BoxConstraints(minWidth: 32, minHeight: 32),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ],
       ),
+    );
+
+    if (!widget.selectionMode) return tile;
+    return InkWell(
+      onTap: item.sold
+          ? null
+          : () => widget.onSelectedChanged?.call(!widget.selected),
+      borderRadius: BorderRadius.circular(14),
+      child: tile,
     );
   }
 
@@ -486,48 +519,66 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
     final ctrl = TextEditingController(
       text: current != null ? current.toStringAsFixed(2) : '',
     );
+    var below = item.alertBelow;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: const [
-            Icon(Icons.notifications_active_outlined, color: Color(0xFFF59E0B)),
-            SizedBox(width: 8),
-            Expanded(child: Text('Alerta de precio')),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Te avisamos con una notificación cuando "${item.itemName}" alcance este precio o más. Déjalo vacío para quitar la alerta.',
-              style: const TextStyle(color: Colors.white70, fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ctrl,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                labelText: 'Precio (${widget.currency})',
-                prefixIcon: Icon(
-                  widget.currency == 'USD' ? Icons.attach_money : Icons.euro,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Row(
+            children: const [
+              Icon(Icons.notifications_active_outlined, color: Color(0xFFF59E0B)),
+              SizedBox(width: 8),
+              Expanded(child: Text('Alerta de precio')),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Te avisamos con una notificación cuando "${item.itemName}" cruce este precio. Déjalo vacío para quitar la alerta.',
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(
+                      value: false,
+                      label: Text('Sube a'),
+                      icon: Icon(Icons.trending_up, size: 16)),
+                  ButtonSegment(
+                      value: true,
+                      label: Text('Baja a'),
+                      icon: Icon(Icons.trending_down, size: 16)),
+                ],
+                selected: {below},
+                onSelectionChanged: (s) => setDialogState(() => below = s.first),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'Precio (${widget.currency})',
+                  prefixIcon: Icon(
+                    widget.currency == 'USD' ? Icons.attach_money : Icons.euro,
+                  ),
                 ),
               ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Guardar'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Guardar'),
-          ),
-        ],
       ),
     );
     final text = ctrl.text;
@@ -540,6 +591,7 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
           item.id,
           currency: widget.currency,
           threshold: value,
+          below: below,
         );
   }
 }

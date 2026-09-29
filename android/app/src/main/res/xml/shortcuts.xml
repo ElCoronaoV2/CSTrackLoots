@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Accesos directos estáticos: mantener pulsado el icono de la app en el
+  launcher para ir directo a Inventario o a Registrar drop, sin pasar por
+  la pantalla principal. Ver MainActivity.kt para cómo se leen en Dart.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="inventory"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_inventory_short"
+        android:shortcutLongLabel="@string/shortcut_inventory_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.cs2tracker.cs2_tracker"
+            android:targetClass="com.cs2tracker.cs2_tracker.MainActivity">
+            <extra android:name="shortcut" android:value="inventory" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="register_drop"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_drop_short"
+        android:shortcutLongLabel="@string/shortcut_drop_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.cs2tracker.cs2_tracker"
+            android:targetClass="com.cs2tracker.cs2_tracker.MainActivity">
+            <extra android:name="shortcut" android:value="register_drop" />
+        </intent>
+    </shortcut>
+</shortcuts>

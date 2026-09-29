@@ -11,6 +11,7 @@ import 'weekly_reset_service.dart';
 class NotifIds {
   static const int resetMoment = 1000;
   static const int reminder24h = 1001;
+  static const int weeklySummary = 1002;
   static const int test = 9999;
 }
 
@@ -142,22 +143,55 @@ class NotificationService {
     }
   }
 
-  /// Notificación inmediata cuando un item del inventario cruza el umbral
-  /// de alerta de precio que el usuario configuró. Usa un id derivado del
-  /// itemId para que alertas de items distintos no se sobrescriban entre sí.
+  /// Notificación inmediata cuando un item (del inventario o de la lista
+  /// de seguimiento) cruza el umbral de alerta de precio que el usuario
+  /// configuró. Usa un id derivado del itemId para que alertas de items
+  /// distintos no se sobrescriban entre sí. [below] = true indica que la
+  /// alerta era de bajada de precio, no de subida.
   Future<void> showPriceAlert({
     required String itemId,
     required String itemName,
     required double price,
     required String currency,
+    bool below = false,
   }) async {
     await init();
     final symbol = currency == 'USD' ? r'$' : '€';
     final id = 2000 + (itemId.hashCode.abs() % 5000);
+    final verb = below ? 'bajó a' : 'alcanzó';
     await _plugin.show(
       id,
       'Alerta de precio',
-      '$itemName alcanzó $symbol${price.toStringAsFixed(2)}',
+      '$itemName $verb $symbol${price.toStringAsFixed(2)}',
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'cs2_drops', 'CS2 Drops',
+          channelDescription: 'Recordatorios del drop semanal y nuevo ciclo de CS2',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(),
+        macOS: DarwinNotificationDetails(),
+      ),
+    );
+  }
+
+  /// Resumen al cerrarse una semana: cuántos drops se consiguieron/perdieron
+  /// y el valor total actual del inventario. Se dispara justo después de
+  /// procesar el reset (ver DropCycleOrchestrator.runStartupCheck).
+  Future<void> showWeeklySummary({
+    required int obtained,
+    required int missed,
+    required double totalValue,
+    required String currency,
+  }) async {
+    await init();
+    final symbol = currency == 'USD' ? r'$' : '€';
+    final valueStr = '$symbol${totalValue.toStringAsFixed(0)}';
+    await _plugin.show(
+      NotifIds.weeklySummary,
+      'Resumen semanal',
+      'Esta semana: $obtained drops conseguidos, $missed perdidos. Valor del inventario: $valueStr.',
       const NotificationDetails(
         android: AndroidNotificationDetails(
           'cs2_drops', 'CS2 Drops',
