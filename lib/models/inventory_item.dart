@@ -91,6 +91,25 @@ extension SkinWearX on SkinWear {
         return 'BS';
     }
   }
+
+  /// Nombre del desgaste en español, tal cual lo muestra el propio cliente
+  /// de Steam en español. Es solo para mostrar en pantalla: [label] (inglés)
+  /// sigue siendo el que se usa para consultar precios en Steam Market /
+  /// Skinport, porque el market_hash_name real siempre está en inglés.
+  String get labelEs {
+    switch (this) {
+      case SkinWear.factoryNew:
+        return 'De fábrica';
+      case SkinWear.minimalWear:
+        return 'Ligeramente usada';
+      case SkinWear.fieldTested:
+        return 'Curtida por el combate';
+      case SkinWear.wellWorn:
+        return 'Bastante usada';
+      case SkinWear.battleScarred:
+        return 'Veterana de mil batallas';
+    }
+  }
 }
 
 /// Item individual en el Inventario General.
@@ -100,11 +119,13 @@ class InventoryItem extends HiveObject {
   @HiveField(0)
   final String id;
 
+  /// Mutables (no `final`) para poder transferir el item a otra cuenta sin
+  /// tener que borrar y recrear la fila (ver [InventoryNotifier.transferItem]).
   @HiveField(1)
-  final String accountId;
+  String accountId;
 
   @HiveField(2)
-  final String accountName;
+  String accountName;
 
   @HiveField(3)
   String itemName;

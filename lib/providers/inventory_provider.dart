@@ -373,6 +373,82 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
     _load();
   }
 
+  /// Transfiere `quantity` unidades (por defecto todas las disponibles) de
+  /// un item a otra cuenta. Si en la cuenta destino ya hay un item apilable
+  /// igual (mismo nombre/categoría, solo para categorías sin wear), se
+  /// fusiona con él en vez de crear una fila duplicada. Si se transfiere
+  /// la fila completa y no hay nada con lo que fusionar, simplemente
+  /// cambia de dueño la misma fila (conserva precio/fecha/id).
+  /// Devuelve `false` si el item no existe, está vendido, o ya es de esa
+  /// cuenta.
+  Future<bool> transferItem(
+    String itemId, {
+    required CsAccount toAccount,
+    int? quantity,
+  }) async {
+    final item = HiveService.inventoryBox.get(itemId);
+    if (item == null || item.sold) return false;
+    if (item.accountId == toAccount.id) return false;
+    final avail = item.availableQuantity;
+    final qty =
+        (quantity == null || quantity <= 0 || quantity > avail) ? avail : quantity;
+    if (qty <= 0) return false;
+
+    final existingTarget = item.category.supportsWearDetails
+        ? null
+        : _findStackable(
+            name: item.itemName,
+            accountId: toAccount.id,
+            category: item.category,
+          );
+
+    if (existingTarget != null) {
+      await _stackOnto(existingTarget, qty: qty, when: DateTime.now());
+      if (qty == item.quantity) {
+        await HiveService.inventoryBox.delete(item.id);
+      } else {
+        item.quantity -= qty;
+        try {
+          await item.save();
+        } catch (_) {}
+      }
+    } else if (qty == item.quantity) {
+      // Fila completa, sin nada con lo que fusionar: solo cambia de dueño.
+      item.accountId = toAccount.id;
+      item.accountName = toAccount.alias;
+      try {
+        await item.save();
+      } catch (_) {
+        return false;
+      }
+    } else {
+      // Transferencia parcial sin stack destino: resta del origen y crea
+      // una fila nueva en la cuenta destino.
+      item.quantity -= qty;
+      try {
+        await item.save();
+      } catch (_) {}
+      final entry = InventoryItem(
+        id: _uuid.v4(),
+        accountId: toAccount.id,
+        accountName: toAccount.alias,
+        itemName: item.itemName,
+        category: item.category,
+        priceEur: item.priceEur,
+        priceUsd: item.priceUsd,
+        quantity: qty,
+        obtainedAt: item.obtainedAt,
+        floatValue: item.floatValue,
+        wear: item.wear,
+        statTrak: item.statTrak,
+        stickers: List<String>.from(item.stickers),
+      );
+      await HiveService.inventoryBox.put(entry.id, entry);
+    }
+    _load();
+    return true;
+  }
+
   Future<void> deleteItem(String itemId) async {
     await HiveService.inventoryBox.delete(itemId);
     _load();

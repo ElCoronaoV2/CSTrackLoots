@@ -74,7 +74,7 @@ class WearDetailsFields extends StatelessWidget {
             ),
             ...SkinWear.values.map(
               (w) => ChoiceChip(
-                label: Text(w.shortLabel),
+                label: Text(w.labelEs),
                 selected: wear == w,
                 onSelected: (_) => onWearChanged(w),
               ),
