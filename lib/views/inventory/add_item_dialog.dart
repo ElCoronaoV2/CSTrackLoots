@@ -6,6 +6,7 @@ import '../../models/cs_account.dart';
 import '../../models/inventory_item.dart';
 import '../../providers/accounts_provider.dart';
 import '../../providers/inventory_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../services/hive_service.dart' show SeedItems;
 import '../../utils/es_names.dart';
 import '../../widgets/wear_details_fields.dart';
@@ -30,6 +31,7 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
   final _nameCtrl = TextEditingController();
   final _floatCtrl = TextEditingController();
   final _stickersCtrl = TextEditingController();
+  final _costCtrl = TextEditingController();
   ItemCategory _category = ItemCategory.skin;
   CsAccount? _selectedAccount; // null => "Sin cuenta" (manual)
   DateTime _date = DateTime.now();
@@ -42,6 +44,7 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
     _nameCtrl.dispose();
     _floatCtrl.dispose();
     _stickersCtrl.dispose();
+    _costCtrl.dispose();
     super.dispose();
   }
 
@@ -71,6 +74,7 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
   Widget build(BuildContext context) {
     final accounts = ref.watch(accountsProvider);
     final dateStr = DateFormat('dd/MM/yyyy').format(_date);
+    final currency = ref.watch(settingsProvider).preferredCurrency;
 
     return AlertDialog(
       title: Row(
@@ -271,6 +275,21 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                   alignment: Alignment.centerLeft,
                 ),
               ),
+              const SizedBox(height: 14),
+              Text('Precio pagado (opcional, en ${currency})',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, color: Colors.white70)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _costCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  hintText: '0 si fue drop gratis',
+                  prefixIcon: Icon(
+                    currency == 'USD' ? Icons.attach_money : Icons.euro,
+                  ),
+                ),
+              ),
               const SizedBox(height: 10),
               Container(
                 padding: const EdgeInsets.all(10),
@@ -306,6 +325,9 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
               ? () async {
                   final messenger = ScaffoldMessenger.of(context);
                   final navigator = Navigator.of(context);
+                  final cost = double.tryParse(
+                          _costCtrl.text.trim().replaceAll(',', '.')) ??
+                      0.0;
                   await ref.read(inventoryProvider.notifier).addManualItem(
                         itemName: _nameCtrl.text,
                         category: _category,
@@ -321,6 +343,8 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                         stickers: _category.supportsWearDetails
                             ? parseStickersField(_stickersCtrl.text)
                             : const <String>[],
+                        costEur: currency == 'USD' ? 0.0 : cost,
+                        costUsd: currency == 'USD' ? cost : 0.0,
                       );
                   if (!mounted) return;
                   navigator.pop();

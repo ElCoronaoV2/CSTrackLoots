@@ -65,6 +65,14 @@ class StatsScreen extends ConsumerWidget {
             const SectionLabel('Mejores tasas de éxito'),
             const SizedBox(height: 12),
             _SuccessRateCard(accounts: accounts),
+            const SizedBox(height: 18),
+            const SectionLabel('Valor por cuenta'),
+            const SizedBox(height: 12),
+            _AccountValueCard(
+              accounts: accounts,
+              items: items,
+              currency: currency,
+            ),
           ],
         ),
       ),
@@ -438,6 +446,93 @@ class _SuccessRateCard extends StatelessWidget {
                     width: 44,
                     child: Text(
                       '${a.successRate.toStringAsFixed(0)}%',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Compara cuántas unidades vale el inventario actual de cada cuenta, para
+/// saber cuál conviene mantener jugando activamente.
+class _AccountValueCard extends StatelessWidget {
+  const _AccountValueCard({
+    required this.accounts,
+    required this.items,
+    required this.currency,
+  });
+  final List<CsAccount> accounts;
+  final List<InventoryItem> items;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    final totals = <String, double>{};
+    for (final it in items) {
+      if (it.sold) continue;
+      final value = (currency == 'USD' ? it.priceUsd : it.priceEur) * it.quantity;
+      totals.update(it.accountId, (v) => v + value, ifAbsent: () => value);
+    }
+    final ranked = accounts.where((a) => (totals[a.id] ?? 0) > 0).toList()
+      ..sort((a, b) => (totals[b.id] ?? 0).compareTo(totals[a.id] ?? 0));
+
+    if (ranked.isEmpty) {
+      return _EmptyCard(
+        icon: Icons.account_balance_wallet_outlined,
+        text: 'Ninguna cuenta tiene items sin vender todavía.',
+      );
+    }
+
+    final maxValue = totals[ranked.first.id] ?? 1;
+
+    return CutCornerCard(
+      color: AppTheme.bgCard,
+      borderColor: AppTheme.csCyan.withValues(alpha: 0.45),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          for (final a in ranked)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 90,
+                    child: Text(
+                      a.alias,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: maxValue <= 0
+                            ? 0
+                            : ((totals[a.id] ?? 0) / maxValue).clamp(0.0, 1.0),
+                        minHeight: 10,
+                        backgroundColor: AppTheme.borderStrong,
+                        color: AppTheme.csCyan,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 70,
+                    child: Text(
+                      formatPrice(totals[a.id] ?? 0, currency),
                       textAlign: TextAlign.right,
                       style: const TextStyle(
                         color: Colors.white70,

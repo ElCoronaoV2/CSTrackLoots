@@ -192,6 +192,19 @@ class InventoryItem extends HiveObject {
   @HiveField(18)
   bool alertBelow;
 
+  /// Lo que realmente pagaste por el item (0.0 si fue un drop gratis o no
+  /// lo recuerdas). Sirve para calcular el beneficio/ROI real, no solo el
+  /// valor de mercado actual.
+  @HiveField(19)
+  double costEur;
+
+  @HiveField(20)
+  double costUsd;
+
+  /// Marcado como favorito para que aparezca destacado/primero en la lista.
+  @HiveField(21)
+  bool isFavorite;
+
   InventoryItem({
     required this.id,
     required this.accountId,
@@ -212,6 +225,9 @@ class InventoryItem extends HiveObject {
     this.alertCurrency,
     this.alerted = false,
     this.alertBelow = false,
+    this.costEur = 0.0,
+    this.costUsd = 0.0,
+    this.isFavorite = false,
   })  : assert(quantity >= 0, 'quantity no puede ser negativa'),
         assert(floatValue == null || (floatValue >= 0.0 && floatValue <= 1.0),
             'floatValue debe estar entre 0.0 y 1.0'),
@@ -221,6 +237,15 @@ class InventoryItem extends HiveObject {
   /// Precio EUR multiplicado por la cantidad disponible (lo que se vende).
   double get totalEur => priceEur * quantity;
   double get totalUsd => priceUsd * quantity;
+
+  /// Coste total pagado por toda la cantidad (0 si fue drop gratis).
+  double get totalCostEur => costEur * quantity;
+  double get totalCostUsd => costUsd * quantity;
+
+  /// Beneficio no realizado: valor de mercado actual menos lo que pagaste,
+  /// para toda la cantidad. Puede ser negativo si el precio bajó.
+  double get unrealizedProfitEur => totalEur - totalCostEur;
+  double get unrealizedProfitUsd => totalUsd - totalCostUsd;
 
   /// Cantidad aún sin vender.
   int get availableQuantity => sold ? 0 : quantity;

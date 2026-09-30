@@ -6,6 +6,7 @@ import '../../models/inventory_item.dart';
 import '../../models/sale_record.dart';
 import '../../providers/inventory_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../../services/csv_export_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/es_names.dart';
 import '../../utils/formatters.dart';
@@ -43,6 +44,25 @@ class SalesHistoryScreen extends ConsumerWidget {
             letterSpacing: 1.2,
           ),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Exportar a CSV',
+            icon: const Icon(Icons.ios_share, size: 22),
+            onPressed: sales.isEmpty
+                ? null
+                : () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    try {
+                      await CsvExportService().exportSales(sales);
+                    } catch (_) {
+                      messenger.showSnackBar(
+                        const SnackBar(
+                            content: Text('No se pudo exportar el CSV.')),
+                      );
+                    }
+                  },
+          ),
+        ],
       ),
       body: BackgroundPattern(
         child: ListView(
@@ -108,6 +128,34 @@ class SalesHistoryScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  Builder(builder: (context) {
+                    final profit = currency == 'USD'
+                        ? summary.profitUsd
+                        : summary.profitEur;
+                    final positive = profit >= 0;
+                    return Row(
+                      children: [
+                        Icon(
+                          positive ? Icons.trending_up : Icons.trending_down,
+                          size: 16,
+                          color:
+                              positive ? AppTheme.csGreen : const Color(0xFFEF4444),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Beneficio real: ${positive ? '+' : ''}${formatPrice(profit, currency)}',
+                          style: TextStyle(
+                            color: positive
+                                ? AppTheme.csGreen
+                                : const Color(0xFFEF4444),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
                 ],
               ),
             ),
@@ -262,6 +310,22 @@ class _SaleTile extends StatelessWidget {
                 '${formatPrice(unit, currency)}/u',
                 style: const TextStyle(color: Colors.white38, fontSize: 11),
               ),
+              if (sale.unitCostEur > 0 || sale.unitCostUsd > 0)
+                Builder(builder: (context) {
+                  final profit =
+                      currency == 'USD' ? sale.profitUsd : sale.profitEur;
+                  final positive = profit >= 0;
+                  return Text(
+                    '${positive ? '+' : ''}${formatPrice(profit, currency)}',
+                    style: TextStyle(
+                      color: positive
+                          ? AppTheme.csGreen
+                          : const Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                    ),
+                  );
+                }),
             ],
           ),
         ],

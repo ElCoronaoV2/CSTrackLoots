@@ -39,6 +39,15 @@ class SaleRecord extends HiveObject {
   @HiveField(7)
   final DateTime soldAt;
 
+  /// Lo que costó (por unidad) el item vendido, para poder calcular el
+  /// beneficio real de la venta. 0.0 si fue un drop gratis o se vendió
+  /// antes de que existiera este campo.
+  @HiveField(8)
+  final double unitCostEur;
+
+  @HiveField(9)
+  final double unitCostUsd;
+
   SaleRecord({
     required this.itemId,
     required this.itemName,
@@ -48,8 +57,15 @@ class SaleRecord extends HiveObject {
     required this.unitPriceEur,
     required this.unitPriceUsd,
     required this.soldAt,
+    this.unitCostEur = 0.0,
+    this.unitCostUsd = 0.0,
   });
 
   double get totalEur => unitPriceEur * quantity;
   double get totalUsd => unitPriceUsd * quantity;
+
+  /// Beneficio real de esta venta (precio de venta - lo que costó), para
+  /// toda la cantidad vendida en este registro.
+  double get profitEur => (unitPriceEur - unitCostEur) * quantity;
+  double get profitUsd => (unitPriceUsd - unitCostUsd) * quantity;
 }

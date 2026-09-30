@@ -5,6 +5,7 @@ import '../../models/inventory_item.dart';
 import '../../providers/accounts_provider.dart';
 import '../../providers/inventory_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../../services/csv_export_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/background_pattern.dart';
@@ -14,6 +15,9 @@ import '../../widgets/offline_banner.dart';
 import '../../widgets/section_label.dart';
 import 'add_item_dialog.dart';
 import 'sales_history_screen.dart';
+
+/// Opciones del menú "más opciones" del AppBar de Inventario.
+enum _InventoryMenuAction { salesHistory, exportCsv }
 
 Future<void> _refreshAll(BuildContext context, WidgetRef ref) async {
   final messenger = ScaffoldMessenger.of(context);
@@ -58,6 +62,13 @@ class InventoryScreen extends ConsumerStatefulWidget {
 class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   bool _selectionMode = false;
   final Set<String> _selected = {};
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   void _toggleSelectionMode() {
     setState(() {
@@ -129,18 +140,21 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         ),
         title: Row(
           children: [
-            Text(
-              _selectionMode
-                  ? '${_selected.length} SELECCIONADOS'
-                  : 'INVENTARIO GENERAL',
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                fontSize: 18,
-                letterSpacing: 1.2,
+            Expanded(
+              child: Text(
+                _selectionMode
+                    ? '${_selected.length} SELECCIONADOS'
+                    : 'INVENTARIO GENERAL',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  fontSize: 18,
+                  letterSpacing: 1.2,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const Spacer(),
             if (!_selectionMode) ...[
               IconButton(
                 tooltip: 'Venta rápida por lote',
@@ -152,14 +166,49 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 icon: const Icon(Icons.refresh, size: 22),
                 onPressed: () => _refreshAll(context, ref),
               ),
-              IconButton(
-                tooltip: 'Historial de ventas',
-                icon: const Icon(Icons.receipt_long_outlined, size: 22),
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const SalesHistoryScreen(),
+              PopupMenuButton<_InventoryMenuAction>(
+                tooltip: 'Más opciones',
+                icon: const Icon(Icons.more_vert, size: 22),
+                onSelected: (action) async {
+                  switch (action) {
+                    case _InventoryMenuAction.salesHistory:
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const SalesHistoryScreen(),
+                        ),
+                      );
+                      break;
+                    case _InventoryMenuAction.exportCsv:
+                      final messenger = ScaffoldMessenger.of(context);
+                      try {
+                        await CsvExportService().exportInventory(filtered);
+                      } catch (_) {
+                        messenger.showSnackBar(
+                          const SnackBar(
+                              content: Text('No se pudo exportar el CSV.')),
+                        );
+                      }
+                      break;
+                  }
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: _InventoryMenuAction.salesHistory,
+                    child: ListTile(
+                      leading: Icon(Icons.receipt_long_outlined),
+                      title: Text('Historial de ventas'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
-                ),
+                  PopupMenuItem(
+                    value: _InventoryMenuAction.exportCsv,
+                    child: ListTile(
+                      leading: Icon(Icons.ios_share),
+                      title: Text('Exportar inventario a CSV'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
               ),
             ],
           ],
@@ -174,6 +223,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               _SummaryCard(
                 totalEur: summary.totalEur,
                 totalUsd: summary.totalUsd,
+                unrealizedProfitEur: summary.unrealizedProfitEur,
+                unrealizedProfitUsd: summary.unrealizedProfitUsd,
+                totalCostEur: summary.totalCostEur,
+                totalCostUsd: summary.totalCostUsd,
                 currency: settings.preferredCurrency,
                 numCases: summary.numCases,
                 numSkins: summary.numSkins,
@@ -189,6 +242,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               _FiltersBar(
                 filter: filter,
                 accounts: accounts,
+                searchController: _searchController,
                 onChange: (f) =>
                     ref.read(inventoryFilterProvider.notifier).state = f,
               ),
@@ -278,6 +332,10 @@ class _SummaryCard extends StatelessWidget {
   const _SummaryCard({
     required this.totalEur,
     required this.totalUsd,
+    required this.unrealizedProfitEur,
+    required this.unrealizedProfitUsd,
+    required this.totalCostEur,
+    required this.totalCostUsd,
     required this.currency,
     required this.numCases,
     required this.numSkins,
@@ -290,6 +348,10 @@ class _SummaryCard extends StatelessWidget {
 
   final double totalEur;
   final double totalUsd;
+  final double unrealizedProfitEur;
+  final double unrealizedProfitUsd;
+  final double totalCostEur;
+  final double totalCostUsd;
   final String currency;
   final int numCases;
   final int numSkins;
@@ -345,6 +407,32 @@ class _SummaryCard extends StatelessWidget {
               '≈ ${formatPrice(totalEur, 'EUR')}',
               style: const TextStyle(color: Colors.white54, fontSize: 14),
             ),
+          if (totalCostEur > 0 || totalCostUsd > 0) ...[
+            const SizedBox(height: 6),
+            Builder(builder: (context) {
+              final profit =
+                  currency == 'USD' ? unrealizedProfitUsd : unrealizedProfitEur;
+              final positive = profit >= 0;
+              return Row(
+                children: [
+                  Icon(
+                    positive ? Icons.trending_up : Icons.trending_down,
+                    size: 16,
+                    color: positive ? AppTheme.csGreen : const Color(0xFFEF4444),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${positive ? '+' : ''}${formatPrice(profit, currency)} vs. lo pagado',
+                    style: TextStyle(
+                      color: positive ? AppTheme.csGreen : const Color(0xFFEF4444),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              );
+            }),
+          ],
           const SizedBox(height: 14),
           Container(height: 1, color: AppTheme.borderStrong),
           const SizedBox(height: 14),
@@ -418,17 +506,48 @@ class _FiltersBar extends StatelessWidget {
     required this.filter,
     required this.accounts,
     required this.onChange,
+    required this.searchController,
   });
 
   final InventoryFilter filter;
   final List accounts;
   final ValueChanged<InventoryFilter> onChange;
+  final TextEditingController searchController;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF161A20),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF2A313B)),
+          ),
+          child: TextField(
+            controller: searchController,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              hintText: 'Buscar por nombre...',
+              hintStyle: const TextStyle(color: Colors.white38),
+              prefixIcon: const Icon(Icons.search, color: Colors.white54),
+              suffixIcon: filter.searchQuery.isEmpty
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.clear, color: Colors.white54),
+                      onPressed: () {
+                        searchController.clear();
+                        onChange(filter.copyWith(searchQuery: ''));
+                      },
+                    ),
+            ),
+            onChanged: (v) => onChange(filter.copyWith(searchQuery: v)),
+          ),
+        ),
+        const SizedBox(height: 8),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
@@ -436,12 +555,8 @@ class _FiltersBar extends StatelessWidget {
               ChoiceChip(
                 label: const Text('Todos'),
                 selected: filter.category == null,
-                onSelected: (_) => onChange(InventoryFilter(
-                  category: null,
-                  accountId: filter.accountId,
-                  includeSold: filter.includeSold,
-                  sort: filter.sort,
-                )),
+                onSelected: (_) =>
+                    onChange(filter.copyWith(clearCategory: true)),
               ),
               const SizedBox(width: 6),
               ...ItemCategory.values.map(
@@ -450,14 +565,20 @@ class _FiltersBar extends StatelessWidget {
                   child: ChoiceChip(
                     label: Text(c.label),
                     selected: filter.category == c,
-                    onSelected: (_) => onChange(InventoryFilter(
-                      category: c,
-                      accountId: filter.accountId,
-                      includeSold: filter.includeSold,
-                      sort: filter.sort,
-                    )),
+                    onSelected: (_) => onChange(filter.copyWith(category: c)),
                   ),
                 ),
+              ),
+              const SizedBox(width: 6),
+              ChoiceChip(
+                avatar: Icon(
+                  Icons.star,
+                  size: 16,
+                  color: filter.favoritesOnly ? Colors.black : AppTheme.csOrange,
+                ),
+                label: const Text('Favoritos'),
+                selected: filter.favoritesOnly,
+                onSelected: (v) => onChange(filter.copyWith(favoritesOnly: v)),
               ),
             ],
           ),
@@ -492,12 +613,11 @@ class _FiltersBar extends StatelessWidget {
                         );
                       }),
                     ],
-                    onChanged: (v) => onChange(InventoryFilter(
-                      category: filter.category,
-                      accountId: v,
-                      includeSold: filter.includeSold,
-                      sort: filter.sort,
-                    )),
+                    onChanged: (v) => onChange(
+                      v == null
+                          ? filter.copyWith(clearAccountId: true)
+                          : filter.copyWith(accountId: v),
+                    ),
                   ),
                 ),
               ),
@@ -507,12 +627,8 @@ class _FiltersBar extends StatelessWidget {
               children: [
                 Checkbox(
                   value: filter.includeSold,
-                  onChanged: (v) => onChange(InventoryFilter(
-                    category: filter.category,
-                    accountId: filter.accountId,
-                    includeSold: v ?? false,
-                    sort: filter.sort,
-                  )),
+                  onChanged: (v) =>
+                      onChange(filter.copyWith(includeSold: v ?? false)),
                 ),
                 const Text('Incluir vendidos', style: TextStyle(color: Colors.white70)),
               ],
@@ -544,12 +660,7 @@ class _FiltersBar extends StatelessWidget {
                     ],
                     onChanged: (v) {
                       if (v == null) return;
-                      onChange(InventoryFilter(
-                        category: filter.category,
-                        accountId: filter.accountId,
-                        includeSold: filter.includeSold,
-                        sort: v,
-                      ));
+                      onChange(filter.copyWith(sort: v));
                     },
                   ),
                 ),

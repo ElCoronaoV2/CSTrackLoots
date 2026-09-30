@@ -54,6 +54,9 @@ class BackupService {
           'alertCurrency': i.alertCurrency,
           'alerted': i.alerted,
           'alertBelow': i.alertBelow,
+          'costEur': i.costEur,
+          'costUsd': i.costUsd,
+          'isFavorite': i.isFavorite,
         }).toList();
 
     final sales = HiveService.salesBox.values.map((s) => {
@@ -65,6 +68,8 @@ class BackupService {
           'unitPriceEur': s.unitPriceEur,
           'unitPriceUsd': s.unitPriceUsd,
           'soldAt': s.soldAt.toIso8601String(),
+          'unitCostEur': s.unitCostEur,
+          'unitCostUsd': s.unitCostUsd,
         }).toList();
 
     return {
@@ -251,6 +256,9 @@ class BackupService {
         alertCurrency: m['alertCurrency'] as String?,
         alerted: m['alerted'] as bool? ?? false,
         alertBelow: m['alertBelow'] as bool? ?? false,
+        costEur: (m['costEur'] as num?)?.toDouble() ?? 0.0,
+        costUsd: (m['costUsd'] as num?)?.toDouble() ?? 0.0,
+        isFavorite: m['isFavorite'] as bool? ?? false,
       );
       await HiveService.inventoryBox.put(item.id, item);
     }
@@ -268,6 +276,8 @@ class BackupService {
         unitPriceEur: (m['unitPriceEur'] as num?)?.toDouble() ?? 0,
         unitPriceUsd: (m['unitPriceUsd'] as num?)?.toDouble() ?? 0,
         soldAt: DateTime.parse(m['soldAt'] as String),
+        unitCostEur: (m['unitCostEur'] as num?)?.toDouble() ?? 0.0,
+        unitCostUsd: (m['unitCostUsd'] as num?)?.toDouble() ?? 0.0,
       );
       await HiveService.salesBox.add(rec);
     }

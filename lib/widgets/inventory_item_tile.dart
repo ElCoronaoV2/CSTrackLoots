@@ -13,7 +13,20 @@ import '../services/skinport_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/es_names.dart';
 import '../utils/formatters.dart';
+import '../utils/market_hash_name.dart';
 import 'item_icons.dart';
+import 'price_history_chart.dart';
+
+/// Acciones del menú "más opciones" de una tile de inventario.
+enum _ItemAction {
+  favorite,
+  compare,
+  priceHistory,
+  transfer,
+  alert,
+  cost,
+  delete
+}
 
 /// Tile de un item en el Inventario General.
 /// Muestra el icono real (cargado en background desde Steam) si está disponible;
@@ -80,11 +93,30 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
             ),
             const SizedBox(width: 4),
           ],
-          _ItemImageBox(
-            itemName: item.itemName,
-            fallbackIcon: icon,
-            fallbackColor: color,
-            size: 46,
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              _ItemImageBox(
+                itemName: item.marketHashName,
+                fallbackIcon: icon,
+                fallbackColor: color,
+                size: 46,
+              ),
+              if (item.isFavorite)
+                Positioned(
+                  top: -4,
+                  left: -4,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF0B0D10),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.star,
+                        size: 14, color: AppTheme.csOrange),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -214,32 +246,27 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
                   fontSize: 16,
                 ),
               ),
+              if (!item.sold && (item.costEur > 0 || item.costUsd > 0)) ...[
+                Builder(builder: (context) {
+                  final profit = widget.currency == 'USD'
+                      ? item.unrealizedProfitUsd
+                      : item.unrealizedProfitEur;
+                  final positive = profit >= 0;
+                  return Text(
+                    '${positive ? '+' : ''}${formatPrice(profit, widget.currency)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: positive ? AppTheme.csGreen : const Color(0xFFEF4444),
+                    ),
+                  );
+                }),
+              ],
               if (!widget.selectionMode) ...[
                 const SizedBox(height: 6),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    IconButton(
-                      tooltip: 'Comparar con Skinport',
-                      onPressed: () => _comparePrices(context),
-                      icon: const Icon(Icons.compare_arrows,
-                          size: 18, color: Colors.white54),
-                      padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(minWidth: 32, minHeight: 32),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    if (!item.sold)
-                      IconButton(
-                        tooltip: 'Transferir a otra cuenta',
-                        onPressed: () => _transferItem(context),
-                        icon: const Icon(Icons.swap_horiz,
-                            size: 18, color: Colors.white54),
-                        padding: EdgeInsets.zero,
-                        constraints:
-                            const BoxConstraints(minWidth: 32, minHeight: 32),
-                        visualDensity: VisualDensity.compact,
-                      ),
                     TextButton.icon(
                       onPressed: () => _confirmSell(context),
                       style: TextButton.styleFrom(
@@ -262,35 +289,121 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
                         ),
                       ),
                     ),
-                    if (!item.sold)
-                      IconButton(
-                        tooltip: item.alertThreshold != null
-                            ? 'Alerta de precio activa'
-                            : 'Poner alerta de precio',
-                        onPressed: () => _setAlert(context),
-                        icon: Icon(
-                          item.alertThreshold != null
-                              ? Icons.notifications_active
-                              : Icons.notifications_none,
-                          size: 18,
-                          color: item.alertThreshold != null
-                              ? AppTheme.csOrange
-                              : Colors.white54,
-                        ),
-                        padding: EdgeInsets.zero,
-                        constraints:
-                            const BoxConstraints(minWidth: 32, minHeight: 32),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    IconButton(
-                      tooltip: 'Eliminar del inventario',
-                      onPressed: () => _confirmDelete(context),
-                      icon: const Icon(Icons.delete_outline,
-                          size: 18, color: Colors.white54),
+                    PopupMenuButton<_ItemAction>(
+                      tooltip: 'Más opciones',
                       padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(minWidth: 32, minHeight: 32),
-                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.more_vert,
+                          size: 18, color: Colors.white54),
+                      onSelected: (action) {
+                        switch (action) {
+                          case _ItemAction.favorite:
+                            ref
+                                .read(inventoryProvider.notifier)
+                                .toggleFavorite(item.id);
+                            break;
+                          case _ItemAction.compare:
+                            _comparePrices(context);
+                            break;
+                          case _ItemAction.priceHistory:
+                            PriceHistoryDialog.show(
+                              context,
+                              title: displayItemName(
+                                  item.itemName, item.category),
+                              marketHashName: item.marketHashName,
+                              currency: widget.currency,
+                            );
+                            break;
+                          case _ItemAction.transfer:
+                            _transferItem(context);
+                            break;
+                          case _ItemAction.alert:
+                            _setAlert(context);
+                            break;
+                          case _ItemAction.cost:
+                            _editCost(context);
+                            break;
+                          case _ItemAction.delete:
+                            _confirmDelete(context);
+                            break;
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: _ItemAction.favorite,
+                          child: ListTile(
+                            leading: Icon(
+                              item.isFavorite
+                                  ? Icons.star
+                                  : Icons.star_border,
+                              size: 20,
+                              color: item.isFavorite
+                                  ? AppTheme.csOrange
+                                  : null,
+                            ),
+                            title: Text(item.isFavorite
+                                ? 'Quitar de favoritos'
+                                : 'Marcar como favorito'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: _ItemAction.compare,
+                          child: ListTile(
+                            leading: Icon(Icons.compare_arrows, size: 20),
+                            title: Text('Comparar con Skinport'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: _ItemAction.priceHistory,
+                          child: ListTile(
+                            leading: Icon(Icons.show_chart, size: 20),
+                            title: Text('Histórico de precio'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                        if (!item.sold)
+                          const PopupMenuItem(
+                            value: _ItemAction.transfer,
+                            child: ListTile(
+                              leading: Icon(Icons.swap_horiz, size: 20),
+                              title: Text('Transferir a otra cuenta'),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                        if (!item.sold)
+                          PopupMenuItem(
+                            value: _ItemAction.alert,
+                            child: ListTile(
+                              leading: Icon(
+                                item.alertThreshold != null
+                                    ? Icons.notifications_active
+                                    : Icons.notifications_none,
+                                size: 20,
+                              ),
+                              title: Text(item.alertThreshold != null
+                                  ? 'Alerta de precio activa'
+                                  : 'Poner alerta de precio'),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                        const PopupMenuItem(
+                          value: _ItemAction.cost,
+                          child: ListTile(
+                            leading: Icon(Icons.payments_outlined, size: 20),
+                            title: Text('Precio pagado / coste'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: _ItemAction.delete,
+                          child: ListTile(
+                            leading: Icon(Icons.delete_outline, size: 20),
+                            title: Text('Eliminar del inventario'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -487,7 +600,7 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
               FutureBuilder<SkinportPrice?>(
                 future: ref
                     .read(skinportServiceProvider)
-                    .getPrice(item.itemName, currency: widget.currency),
+                    .getPrice(item.marketHashName, currency: widget.currency),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState != ConnectionState.done) {
                     return const Padding(
@@ -674,6 +787,69 @@ class _InventoryItemTileState extends ConsumerState<InventoryItemTile> {
         ),
       ),
     );
+  }
+
+  Future<void> _editCost(BuildContext context) async {
+    final item = widget.item;
+    final current = widget.currency == 'USD' ? item.costUsd : item.costEur;
+    final ctrl = TextEditingController(
+      text: current > 0 ? current.toStringAsFixed(2) : '',
+    );
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: const [
+            Icon(Icons.payments_outlined, color: Color(0xFFF59E0B)),
+            SizedBox(width: 8),
+            Expanded(child: Text('Precio pagado')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Lo que pagaste por "${displayItemName(item.itemName, item.category)}" (0 si fue drop gratis). Se usa para calcular tu beneficio real, no solo el valor de mercado.',
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'Precio pagado (${widget.currency})',
+                prefixIcon: Icon(
+                  widget.currency == 'USD' ? Icons.attach_money : Icons.euro,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+    final text = ctrl.text;
+    ctrl.dispose();
+    if (confirmed != true || !mounted) return;
+
+    final trimmed = text.trim().replaceAll(',', '.');
+    final value = double.tryParse(trimmed) ?? 0.0;
+    await ref.read(inventoryProvider.notifier).setCost(
+          item.id,
+          costEur: widget.currency == 'USD' ? item.costEur : value,
+          costUsd: widget.currency == 'USD' ? value : item.costUsd,
+        );
   }
 
   Future<void> _setAlert(BuildContext context) async {

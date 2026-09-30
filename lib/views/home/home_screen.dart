@@ -21,6 +21,9 @@ import '../settings/settings_screen.dart';
 import '../stats/stats_screen.dart';
 import '../watchlist/watchlist_screen.dart';
 
+/// Opciones del menú "más opciones" del AppBar principal.
+enum _HomeMenuAction { stats, compare, settings }
+
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -48,6 +51,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
       try {
         await StatsService.recordDailyRankSnapshotsIfNeeded();
+      } catch (_) {}
+
+      try {
+        await StatsService.recordDailyItemPriceSnapshotsIfNeeded();
       } catch (_) {}
 
       try {
@@ -137,24 +144,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.bar_chart, size: 22),
-            tooltip: 'Estadísticas',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const StatsScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.price_check, size: 22),
-            tooltip: 'Comparador de precios',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SkinCompareScreen()),
-              );
-            },
-          ),
-          IconButton(
             icon: const Icon(Icons.inventory_2_outlined, size: 22),
             tooltip: 'Inventario General',
             onPressed: () {
@@ -172,14 +161,55 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined, size: 22),
-            tooltip: 'Ajustes',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              );
+          PopupMenuButton<_HomeMenuAction>(
+            tooltip: 'Más opciones',
+            icon: const Icon(Icons.more_vert, size: 22),
+            onSelected: (action) {
+              switch (action) {
+                case _HomeMenuAction.stats:
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const StatsScreen()),
+                  );
+                  break;
+                case _HomeMenuAction.compare:
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const SkinCompareScreen()),
+                  );
+                  break;
+                case _HomeMenuAction.settings:
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                  break;
+              }
             },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: _HomeMenuAction.stats,
+                child: ListTile(
+                  leading: Icon(Icons.bar_chart),
+                  title: Text('Estadísticas'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: _HomeMenuAction.compare,
+                child: ListTile(
+                  leading: Icon(Icons.price_check),
+                  title: Text('Comparador de precios'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: _HomeMenuAction.settings,
+                child: ListTile(
+                  leading: Icon(Icons.settings_outlined),
+                  title: Text('Ajustes'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
           ),
         ],
       ),

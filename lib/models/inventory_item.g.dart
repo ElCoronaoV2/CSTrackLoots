@@ -39,13 +39,16 @@ class InventoryItemAdapter extends TypeAdapter<InventoryItem> {
       alertCurrency: fields[16] as String?,
       alerted: fields[17] as bool? ?? false,
       alertBelow: fields[18] as bool? ?? false,
+      costEur: fields[19] as double? ?? 0.0,
+      costUsd: fields[20] as double? ?? 0.0,
+      isFavorite: fields[21] as bool? ?? false,
     );
   }
 
   @override
   void write(BinaryWriter writer, InventoryItem obj) {
     writer
-      ..writeByte(19)
+      ..writeByte(22)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -83,7 +86,13 @@ class InventoryItemAdapter extends TypeAdapter<InventoryItem> {
       ..writeByte(17)
       ..write(obj.alerted)
       ..writeByte(18)
-      ..write(obj.alertBelow);
+      ..write(obj.alertBelow)
+      ..writeByte(19)
+      ..write(obj.costEur)
+      ..writeByte(20)
+      ..write(obj.costUsd)
+      ..writeByte(21)
+      ..write(obj.isFavorite);
   }
 
   @override
