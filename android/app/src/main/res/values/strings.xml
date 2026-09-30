@@ -4,4 +4,6 @@
     <string name="shortcut_inventory_long">Ver inventario general</string>
     <string name="shortcut_drop_short">Registrar drop</string>
     <string name="shortcut_drop_long">Registrar drop semanal</string>
+    <string name="widget_title">CS2 TRACKER</string>
+    <string name="widget_description">Valor total de tu inventario y si tienes algún drop pendiente.</string>
 </resources>

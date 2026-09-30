@@ -8,6 +8,7 @@ import '../../services/hive_service.dart' show SeedItems;
 import '../../services/skinport_service.dart';
 import '../../services/steam_market_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/es_names.dart';
 import '../../utils/formatters.dart';
 import '../../utils/market_hash_name.dart';
 import '../../widgets/wear_details_fields.dart' show parseFloatField;
@@ -124,9 +125,8 @@ class _SkinCompareScreenState extends ConsumerState<SkinCompareScreen> {
           Autocomplete<String>(
             optionsBuilder: (TextEditingValue value) {
               if (value.text.isEmpty) return const Iterable<String>.empty();
-              final q = value.text.toLowerCase();
               return SeedItems.forCategory(_category)
-                  .where((s) => s.toLowerCase().contains(q))
+                  .where((s) => itemMatchesQuery(s, _category, value.text))
                   .take(8);
             },
             onSelected: (sel) {
@@ -176,7 +176,7 @@ class _SkinCompareScreenState extends ConsumerState<SkinCompareScreen> {
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 10),
-                            child: Text(option),
+                            child: Text(displayItemName(option, _category)),
                           ),
                         );
                       },

@@ -27,13 +27,16 @@ class AppSettingsAdapter extends TypeAdapter<AppSettings> {
       autoBackupIntervalDays: fields[5] as int? ?? 7,
       lastAutoBackupEpochMs: fields[6] as int? ?? 0,
       steamApiKey: fields[7] as String?,
+      appLockEnabled: fields[8] as bool? ?? false,
+      pinHash: fields[9] as String?,
+      biometricEnabled: fields[10] as bool? ?? false,
     );
   }
 
   @override
   void write(BinaryWriter writer, AppSettings obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(11)
       ..writeByte(0)
       ..write(obj.preferredCurrency)
       ..writeByte(1)
@@ -49,7 +52,13 @@ class AppSettingsAdapter extends TypeAdapter<AppSettings> {
       ..writeByte(6)
       ..write(obj.lastAutoBackupEpochMs)
       ..writeByte(7)
-      ..write(obj.steamApiKey);
+      ..write(obj.steamApiKey)
+      ..writeByte(8)
+      ..write(obj.appLockEnabled)
+      ..writeByte(9)
+      ..write(obj.pinHash)
+      ..writeByte(10)
+      ..write(obj.biometricEnabled);
   }
 
   @override

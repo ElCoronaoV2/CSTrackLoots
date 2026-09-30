@@ -5,7 +5,10 @@ import 'package:intl/intl.dart';
 import '../../providers/accounts_provider.dart';
 import '../../providers/services_providers.dart';
 import '../../providers/settings_provider.dart';
+import '../../services/app_lock_service.dart';
 import '../../services/backup_service.dart';
+
+const _settingsPinLength = 4;
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -179,6 +182,8 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           _SteamSection(initialApiKey: settings.steamApiKey),
           const SizedBox(height: 16),
+          const _SecuritySection(),
+          const SizedBox(height: 16),
           _Section(
             title: 'Acerca de',
             child: const Column(
@@ -333,6 +338,160 @@ class _SteamSectionState extends ConsumerState<_SteamSection> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SecuritySection extends ConsumerStatefulWidget {
+  const _SecuritySection();
+
+  @override
+  ConsumerState<_SecuritySection> createState() => _SecuritySectionState();
+}
+
+class _SecuritySectionState extends ConsumerState<_SecuritySection> {
+  bool _biometricsAvailable = false;
+
+  @override
+  void initState() {
+    super.initState();
+    AppLockService().canUseBiometrics().then((v) {
+      if (mounted) setState(() => _biometricsAvailable = v);
+    });
+  }
+
+  Future<void> _setUpPin() async {
+    final pin = await _PinEntryDialog.show(context, title: 'Nuevo PIN');
+    if (pin == null || !mounted) return;
+    final confirm = await _PinEntryDialog.show(context, title: 'Repite el PIN');
+    if (confirm == null || !mounted) return;
+    if (pin != confirm) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Los PIN no coinciden.')),
+      );
+      return;
+    }
+    await ref.read(settingsProvider.notifier).setPin(pin);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('PIN configurado. Bloqueo activado.')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = ref.watch(settingsProvider);
+    final hasPin = settings.pinHash != null;
+
+    return _Section(
+      title: 'Seguridad',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Pide PIN (y huella/Face ID, si tu móvil la soporta) para abrir la app.',
+            style: TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Bloqueo con PIN'),
+            value: settings.appLockEnabled && hasPin,
+            onChanged: (v) async {
+              if (v) {
+                await _setUpPin();
+              } else {
+                await ref.read(settingsProvider.notifier).clearPin();
+              }
+            },
+          ),
+          if (settings.appLockEnabled && hasPin) ...[
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.password),
+              title: const Text('Cambiar PIN'),
+              onTap: _setUpPin,
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Usar también huella / Face ID'),
+              subtitle: Text(
+                _biometricsAvailable
+                    ? 'Como alternativa rápida al PIN.'
+                    : 'Este dispositivo no tiene huella/Face ID configurada.',
+              ),
+              value: settings.biometricEnabled,
+              onChanged: _biometricsAvailable
+                  ? (v) => ref.read(settingsProvider.notifier).setBiometricEnabled(v)
+                  : null,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PinEntryDialog extends StatefulWidget {
+  const _PinEntryDialog({required this.title});
+  final String title;
+
+  static Future<String?> show(BuildContext context, {required String title}) {
+    return showDialog<String>(
+      context: context,
+      builder: (_) => _PinEntryDialog(title: title),
+    );
+  }
+
+  @override
+  State<_PinEntryDialog> createState() => _PinEntryDialogState();
+}
+
+class _PinEntryDialogState extends State<_PinEntryDialog> {
+  final _ctrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _ctrl,
+        autofocus: true,
+        obscureText: true,
+        keyboardType: TextInputType.number,
+        maxLength: _settingsPinLength,
+        decoration: const InputDecoration(
+          labelText: 'PIN de 4 dígitos',
+          counterText: '',
+        ),
+        onSubmitted: (v) {
+          if (v.length == _settingsPinLength) Navigator.of(context).pop(v);
+        },
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _ctrl.text.length == _settingsPinLength
+              ? () => Navigator.of(context).pop(_ctrl.text)
+              : null,
+          child: const Text('Aceptar'),
+        ),
+      ],
     );
   }
 }

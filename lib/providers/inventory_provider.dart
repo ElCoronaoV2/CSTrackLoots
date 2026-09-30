@@ -6,7 +6,10 @@ import '../models/cs_account.dart';
 import '../models/inventory_item.dart';
 import '../models/sale_record.dart';
 import '../services/hive_service.dart';
+import '../services/home_widget_service.dart';
 import '../services/steam_market_service.dart';
+import '../utils/es_names.dart';
+import '../utils/market_hash_name.dart';
 import 'accounts_provider.dart';
 import 'services_providers.dart';
 
@@ -54,6 +57,8 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
     final list = HiveService.inventoryBox.values.toList()
       ..sort((a, b) => b.obtainedAt.compareTo(a.obtainedAt));
     state = list;
+    // ignore: unawaited_futures
+    HomeWidgetService.update();
   }
 
   @override
@@ -167,13 +172,19 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
     SkinWear? wear,
     bool statTrak = false,
     List<String> stickers = const [],
+    double costEur = 0.0,
+    double costUsd = 0.0,
   }) async {
     final name = itemName.trim();
     final qty = quantity <= 0 ? 1 : quantity;
     final accountId = account?.id ?? '__manual__';
 
-    final existing =
-        _findStackable(name: name, accountId: accountId, category: category);
+    // Los items apilables no distinguen coste por unidad individual, así que
+    // si hay coste y ya existe un stack, se guarda como item nuevo en vez de
+    // apilar (para no perder ese dato de a cuánto se compró cada unidad).
+    final existing = (costEur == 0.0 && costUsd == 0.0)
+        ? _findStackable(name: name, accountId: accountId, category: category)
+        : null;
     if (existing != null) {
       final stacked = await _stackOnto(existing, qty: qty, when: obtainedAt);
       _load();
@@ -193,12 +204,37 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
       wear: wear,
       statTrak: statTrak,
       stickers: stickers,
+      costEur: costEur,
+      costUsd: costUsd,
     );
     await HiveService.inventoryBox.put(entry.id, entry);
     _load();
 
     _enrichItems(<InventoryItem>[entry]);
     return entry;
+  }
+
+  /// Cambia lo que se pagó por un item (para el cálculo de beneficio real).
+  Future<void> setCost(String itemId,
+      {required double costEur, required double costUsd}) async {
+    final item = HiveService.inventoryBox.get(itemId);
+    if (item == null) return;
+    item.costEur = costEur;
+    item.costUsd = costUsd;
+    try {
+      await item.save();
+    } catch (_) {}
+    _load();
+  }
+
+  Future<void> toggleFavorite(String itemId) async {
+    final item = HiveService.inventoryBox.get(itemId);
+    if (item == null) return;
+    item.isFavorite = !item.isFavorite;
+    try {
+      await item.save();
+    } catch (_) {}
+    _load();
   }
 
   /// Fija (o quita, con `threshold: null`) el umbral de alerta de precio
@@ -266,9 +302,10 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
   void _enrichItems(List<InventoryItem> items) {
     final market = ref.read(steamMarketServiceProvider);
     for (final e in items) {
+      final hashName = e.marketHashName;
       // ignore: unawaited_futures
       market
-          .getPrice(e.itemName, silent: true)
+          .getPrice(hashName, silent: true)
           .then((result) async {
             if (result.status == PriceStatus.fresh && e.isInBox) {
               e.priceEur = result.priceEur;
@@ -283,7 +320,7 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
           .catchError((_) {/* silencio: nunca debe crashear */});
       // ignore: unawaited_futures
       market
-          .getIconUrl(e.itemName, silent: true)
+          .getIconUrl(hashName, silent: true)
           .then((iconUrl) async {
             if (iconUrl.isNotEmpty && e.isInBox) {
               try {
@@ -332,6 +369,8 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
       unitPriceEur: item.priceEur,
       unitPriceUsd: item.priceUsd,
       soldAt: soldNow,
+      unitCostEur: item.costEur,
+      unitCostUsd: item.costUsd,
     );
     await HiveService.salesBox.add(record);
 
@@ -468,7 +507,8 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
     var done = 0;
     for (final item in items) {
       try {
-        final price = await market.getPrice(item.itemName, forceRefresh: force);
+        final hashName = item.marketHashName;
+        final price = await market.getPrice(hashName, forceRefresh: force);
         if (price.status == PriceStatus.fresh && item.isInBox) {
           item.priceEur = price.priceEur;
           item.priceUsd = price.priceUsd;
@@ -477,7 +517,7 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
           } catch (_) {}
           await _checkPriceAlert(item);
         }
-        await market.getIconUrl(item.itemName, forceRefresh: force, silent: true);
+        await market.getIconUrl(hashName, forceRefresh: force, silent: true);
       } catch (_) {/* silencio */}
       done++;
       onProgress?.call(done, total);
@@ -491,7 +531,8 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
     if (item == null) return;
     final market = ref.read(steamMarketServiceProvider);
     try {
-      final price = await market.getPrice(item.itemName, forceRefresh: force);
+      final hashName = item.marketHashName;
+      final price = await market.getPrice(hashName, forceRefresh: force);
       if (price.status == PriceStatus.fresh && item.isInBox) {
         item.priceEur = price.priceEur;
         item.priceUsd = price.priceUsd;
@@ -500,7 +541,7 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
         } catch (_) {}
         await _checkPriceAlert(item);
       }
-      await market.getIconUrl(item.itemName, forceRefresh: force, silent: true);
+      await market.getIconUrl(hashName, forceRefresh: force, silent: true);
     } catch (_) {}
     _load();
   }
@@ -509,36 +550,47 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
 final inventoryProvider =
     StateNotifierProvider<InventoryNotifier, List<InventoryItem>>((ref) => InventoryNotifier(ref));
 
-/// Filtros del inventario (categoría y cuenta).
+/// Filtros del inventario (categoría, cuenta y búsqueda por texto).
 class InventoryFilter {
   final ItemCategory? category;
   final String? accountId;
   final bool includeSold;
   final InventorySort sort;
+  final String searchQuery;
+  final bool favoritesOnly;
   const InventoryFilter({
     this.category,
     this.accountId,
     this.includeSold = false,
     this.sort = InventorySort.dateDesc,
+    this.searchQuery = '',
+    this.favoritesOnly = false,
   });
 
   InventoryFilter copyWith({
     ItemCategory? category,
+    bool clearCategory = false,
     String? accountId,
+    bool clearAccountId = false,
     bool? includeSold,
     InventorySort? sort,
+    String? searchQuery,
+    bool? favoritesOnly,
   }) =>
       InventoryFilter(
-        category: category ?? this.category,
-        accountId: accountId ?? this.accountId,
+        category: clearCategory ? null : (category ?? this.category),
+        accountId: clearAccountId ? null : (accountId ?? this.accountId),
         includeSold: includeSold ?? this.includeSold,
         sort: sort ?? this.sort,
+        searchQuery: searchQuery ?? this.searchQuery,
+        favoritesOnly: favoritesOnly ?? this.favoritesOnly,
       );
 }
 
 final inventoryFilterProvider = StateProvider<InventoryFilter>((ref) => const InventoryFilter());
 
-/// Lista filtrada y ordenada.
+/// Lista filtrada y ordenada. Los favoritos siempre aparecen primero,
+/// respetando el orden elegido dentro de cada grupo (favoritos / resto).
 final filteredInventoryProvider = Provider<List<InventoryItem>>((ref) {
   final items = ref.watch(inventoryProvider);
   final filter = ref.watch(inventoryFilterProvider);
@@ -546,6 +598,11 @@ final filteredInventoryProvider = Provider<List<InventoryItem>>((ref) {
     if (!filter.includeSold && it.sold) return false;
     if (filter.category != null && it.category != filter.category) return false;
     if (filter.accountId != null && it.accountId != filter.accountId) return false;
+    if (filter.favoritesOnly && !it.isFavorite) return false;
+    if (filter.searchQuery.trim().isNotEmpty &&
+        !itemMatchesQuery(it.itemName, it.category, filter.searchQuery)) {
+      return false;
+    }
     return true;
   }).toList();
   switch (filter.sort) {
@@ -572,6 +629,10 @@ final filteredInventoryProvider = Provider<List<InventoryItem>>((ref) {
           (a, b) => b.itemName.toLowerCase().compareTo(a.itemName.toLowerCase()));
       break;
   }
+  // Los favoritos suben al principio manteniendo el orden ya calculado
+  // dentro de cada grupo (stable sort no reordena entre iguales).
+  filtered.sort((a, b) =>
+      (b.isFavorite ? 1 : 0).compareTo(a.isFavorite ? 1 : 0));
   return filtered;
 });
 
@@ -579,6 +640,8 @@ final filteredInventoryProvider = Provider<List<InventoryItem>>((ref) {
 class InventorySummary {
   final double totalEur;
   final double totalUsd;
+  final double totalCostEur;
+  final double totalCostUsd;
   final int numCases;
   final int numSkins;
   final int numGrafitis;
@@ -590,6 +653,8 @@ class InventorySummary {
   const InventorySummary({
     required this.totalEur,
     required this.totalUsd,
+    required this.totalCostEur,
+    required this.totalCostUsd,
     required this.numCases,
     required this.numSkins,
     required this.numGrafitis,
@@ -598,15 +663,21 @@ class InventorySummary {
     required this.numOther,
     required this.totalActive,
   });
+
+  /// Beneficio no realizado del inventario completo (valor actual - coste).
+  double get unrealizedProfitEur => totalEur - totalCostEur;
+  double get unrealizedProfitUsd => totalUsd - totalCostUsd;
 }
 
 final inventorySummaryProvider = Provider<InventorySummary>((ref) {
   final items = ref.watch(inventoryProvider).where((i) => !i.sold).toList();
-  double eur = 0, usd = 0;
+  double eur = 0, usd = 0, costEur = 0, costUsd = 0;
   int cases = 0, skins = 0, grafs = 0, knives = 0, gloves = 0, other = 0;
   for (final i in items) {
     eur += i.priceEur * i.quantity;
     usd += i.priceUsd * i.quantity;
+    costEur += i.costEur * i.quantity;
+    costUsd += i.costUsd * i.quantity;
     switch (i.category) {
       case ItemCategory.caseBox:
         cases++;
@@ -631,6 +702,8 @@ final inventorySummaryProvider = Provider<InventorySummary>((ref) {
   return InventorySummary(
     totalEur: eur,
     totalUsd: usd,
+    totalCostEur: costEur,
+    totalCostUsd: costUsd,
     numCases: cases,
     numSkins: skins,
     numGrafitis: grafs,
@@ -645,11 +718,15 @@ final inventorySummaryProvider = Provider<InventorySummary>((ref) {
 class SalesSummary {
   final double totalEur;
   final double totalUsd;
+  final double profitEur;
+  final double profitUsd;
   final int totalQuantity;
   final int totalRecords;
   const SalesSummary({
     required this.totalEur,
     required this.totalUsd,
+    required this.profitEur,
+    required this.profitUsd,
     required this.totalQuantity,
     required this.totalRecords,
   });
@@ -664,16 +741,20 @@ final salesListProvider = StateProvider<List<SaleRecord>>((ref) {
 
 final salesSummaryProvider = Provider<SalesSummary>((ref) {
   final sales = ref.watch(salesListProvider);
-  double eur = 0, usd = 0;
+  double eur = 0, usd = 0, profitEur = 0, profitUsd = 0;
   int qty = 0;
   for (final s in sales) {
     eur += s.totalEur;
     usd += s.totalUsd;
+    profitEur += s.profitEur;
+    profitUsd += s.profitUsd;
     qty += s.quantity;
   }
   return SalesSummary(
     totalEur: eur,
     totalUsd: usd,
+    profitEur: profitEur,
+    profitUsd: profitUsd,
     totalQuantity: qty,
     totalRecords: sales.length,
   );

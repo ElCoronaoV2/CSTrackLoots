@@ -4,6 +4,7 @@ import '../models/app_settings.dart';
 import '../models/cs_account.dart';
 import '../models/cs_rank_enums.dart';
 import '../models/inventory_item.dart';
+import '../models/item_price_snapshot.dart';
 import '../models/price_cache_entry.dart';
 import '../models/rank_snapshot.dart';
 import '../models/sale_record.dart';
@@ -15,20 +16,24 @@ import '../models/watchlist_item.dart';
 /// Separada por categoría para que el autocompletado solo sugiera items
 /// coherentes con la categoría seleccionada (ver [forCategory]).
 class SeedItems {
-  /// Todas las cajas de armas oficiales lanzadas por Valve, en orden
-  /// cronológico. Los souvenir package de majors no están (son demasiados
-  /// y específicos de cada torneo/mapa); para eso sirve "Otro" con texto libre.
+  /// Todas las cajas de armas, maletines de eSports, cajas de grafitis y
+  /// cajas de kits de música oficiales de Valve, en orden cronológico
+  /// (fuente: catálogo verificado con nombre EN/ES de cada una). Los
+  /// souvenir package de majors no están (son 400+, uno por mapa/torneo);
+  /// para eso sirve "Otro" con texto libre.
   static const List<String> cases = <String>[
     'CS:GO Weapon Case',
     'eSports 2013 Case',
     'Operation Bravo Case',
     'CS:GO Weapon Case 2',
-    'CS:GO Weapon Case 3',
+    'eSports 2013 Winter Case',
     'Winter Offensive Weapon Case',
-    'eSports 2014 Summer Case',
-    'Operation Breakout Weapon Case',
-    'Huntsman Weapon Case',
+    'CS:GO Weapon Case 3',
     'Operation Phoenix Weapon Case',
+    'Huntsman Weapon Case',
+    'Operation Breakout Weapon Case',
+    'eSports 2014 Summer Case',
+    'Operation Vanguard Weapon Case',
     'Chroma Case',
     'Chroma 2 Case',
     'Falchion Case',
@@ -36,8 +41,12 @@ class SeedItems {
     'Revolver Case',
     'Operation Wildfire Case',
     'Chroma 3 Case',
+    'Community Graffiti Box 1',
     'Gamma Case',
     'Gamma 2 Case',
+    'CS:GO Graffiti Box',
+    'Perfect World Graffiti Box',
+    'StatTrak™ Radicals Box',
     'Glove Case',
     'Spectrum Case',
     'Operation Hydra Case',
@@ -46,21 +55,31 @@ class SeedItems {
     'Horizon Case',
     'Danger Zone Case',
     'Prisma Case',
-    'CS20 Case',
     'Shattered Web Case',
+    'CS20 Case',
     'Prisma 2 Case',
+    'Masterminds Music Kit Box',
+    'StatTrak™ Masterminds Music Kit Box',
     'Fracture Case',
     'Operation Broken Fang Case',
-    'Operation Riptide Case',
     'Snakebite Case',
+    'Tacticians Music Kit Box',
+    'StatTrak™ Tacticians Music Kit Box',
+    'Operation Riptide Case',
     'Dreams & Nightmares Case',
     'Recoil Case',
+    'Initiators Music Kit Box',
+    'StatTrak™ Initiators Music Kit Box',
     'Revolution Case',
     'Kilowatt Case',
+    'NIGHTMODE Music Kit Box',
+    'StatTrak™ NIGHTMODE Music Kit Box',
+    'Masterminds 2 Music Kit Box',
+    'StatTrak™ Masterminds 2 Music Kit Box',
     'Gallery Case',
     'Fever Case',
-    'Operation Vanguard Weapon Case',
-    'Operation Bloodhound Weapon Case',
+    'Deluge Music Kit Box',
+    'StatTrak™ Deluge Music Kit Box',
   ];
 
   /// Stickers y grafitis frecuentes en drops (texto libre normalmente, esto
@@ -496,6 +515,7 @@ class HiveService {
   static const String valueSnapshotsBoxName = 'value_snapshots';
   static const String watchlistBoxName = 'watchlist';
   static const String rankSnapshotsBoxName = 'rank_snapshots';
+  static const String itemPriceSnapshotsBoxName = 'item_price_snapshots';
   static const String settingsKey = 'app_settings';
 
   static Future<void> init() async {
@@ -522,6 +542,9 @@ class HiveService {
     if (!Hive.isAdapterRegistered(11)) {
       Hive.registerAdapter(RankSnapshotAdapter());
     }
+    if (!Hive.isAdapterRegistered(12)) {
+      Hive.registerAdapter(ItemPriceSnapshotAdapter());
+    }
 
     // Apertura de boxes.
     await Hive.openBox<CsAccount>(accountsBoxName);
@@ -531,6 +554,7 @@ class HiveService {
     await Hive.openBox<ValueSnapshot>(valueSnapshotsBoxName);
     await Hive.openBox<WatchlistItem>(watchlistBoxName);
     await Hive.openBox<RankSnapshot>(rankSnapshotsBoxName);
+    await Hive.openBox<ItemPriceSnapshot>(itemPriceSnapshotsBoxName);
     final settingsBox = await Hive.openBox<AppSettings>(settingsBoxName);
 
     if (settingsBox.get(settingsKey) == null) {
@@ -552,6 +576,8 @@ class HiveService {
       Hive.box<WatchlistItem>(watchlistBoxName);
   static Box<RankSnapshot> get rankSnapshotsBox =>
       Hive.box<RankSnapshot>(rankSnapshotsBoxName);
+  static Box<ItemPriceSnapshot> get itemPriceSnapshotsBox =>
+      Hive.box<ItemPriceSnapshot>(itemPriceSnapshotsBoxName);
 
   static AppSettings get settings => settingsBox.get(settingsKey)!;
 }

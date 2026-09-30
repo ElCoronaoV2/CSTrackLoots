@@ -38,6 +38,13 @@ dependencies:
   # Gráficas del dashboard de estadísticas
   fl_chart: ^1.2.0
 
+  # Bloqueo de la app con PIN/huella
+  local_auth: ^2.3.0
+  crypto: ^3.0.6
+
+  # Widget de pantalla de inicio (Android)
+  home_widget: ^0.10.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

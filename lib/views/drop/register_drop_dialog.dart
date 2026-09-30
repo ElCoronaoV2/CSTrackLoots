@@ -5,6 +5,7 @@ import '../../models/cs_account.dart';
 import '../../models/inventory_item.dart';
 import '../../providers/inventory_provider.dart';
 import '../../services/hive_service.dart' show SeedItems;
+import '../../utils/es_names.dart';
 import '../../widgets/wear_details_fields.dart';
 
 class _DropItem {
@@ -209,9 +210,9 @@ class _ItemRow extends StatelessWidget {
                 initialValue: TextEditingValue(text: item.name.text),
                 optionsBuilder: (TextEditingValue value) {
                   if (value.text.isEmpty) return const Iterable<String>.empty();
-                  final query = value.text.toLowerCase();
                   return SeedItems.forCategory(item.category)
-                      .where((s) => s.toLowerCase().contains(query))
+                      .where((s) =>
+                          itemMatchesQuery(s, item.category, value.text))
                       .take(8);
                 },
                 onSelected: (selection) {
@@ -261,7 +262,8 @@ class _ItemRow extends StatelessWidget {
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 12, vertical: 10),
-                                child: Text(option),
+                                child:
+                                    Text(displayItemName(option, item.category)),
                               ),
                             );
                           },

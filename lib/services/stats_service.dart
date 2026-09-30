@@ -1,5 +1,7 @@
+import '../models/item_price_snapshot.dart';
 import '../models/rank_snapshot.dart';
 import '../models/value_snapshot.dart';
+import '../utils/market_hash_name.dart';
 import 'hive_service.dart';
 
 /// Registra snapshots diarios (valor del inventario, rango por cuenta) para
@@ -45,6 +47,41 @@ class StatsService {
         ),
       );
     }
+  }
+
+  /// Guarda el precio de hoy de cada item distinto del inventario (no
+  /// vendido), si todavía no se ha registrado uno para ese día. Llamar una
+  /// vez al arrancar la app. Varias unidades del mismo item (mismo
+  /// market_hash_name) comparten un único punto en el histórico.
+  static Future<void> recordDailyItemPriceSnapshotsIfNeeded() async {
+    final box = HiveService.itemPriceSnapshotsBox;
+    final today = _todayKey();
+    final seen = <String>{};
+    for (final item in HiveService.inventoryBox.values) {
+      if (item.sold) continue;
+      final hashName = item.marketHashName;
+      if (!seen.add(hashName)) continue;
+      final key = '$hashName|$today';
+      if (box.containsKey(key)) continue;
+      await box.put(
+        key,
+        ItemPriceSnapshot(
+          marketHashName: hashName,
+          date: DateTime.now(),
+          priceEur: item.priceEur,
+          priceUsd: item.priceUsd,
+        ),
+      );
+    }
+  }
+
+  /// Histórico de precio de un item concreto, ordenado por fecha ascendente.
+  static List<ItemPriceSnapshot> priceHistoryFor(String marketHashName) {
+    final list = HiveService.itemPriceSnapshotsBox.values
+        .where((s) => s.marketHashName == marketHashName)
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+    return list;
   }
 
   static String _todayKey() {

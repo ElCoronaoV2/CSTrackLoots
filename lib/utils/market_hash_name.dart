@@ -23,3 +23,14 @@ SkinWear approximateWearFromFloat(double float) {
   if (float < 0.45) return SkinWear.wellWorn;
   return SkinWear.battleScarred;
 }
+
+/// market_hash_name completo de un item del inventario (con StatTrak™ y
+/// desgaste si los tiene). Es la clave que hay que usar SIEMPRE para
+/// consultar precio/icono en Steam Market o Skinport y para cachearlos —
+/// usar solo [InventoryItem.itemName] para una skin/cuchillo/guante con
+/// desgaste consulta un listado que no existe en Steam (le falta el
+/// desgaste) y siempre devuelve "no encontrado".
+extension InventoryItemMarketHashName on InventoryItem {
+  String get marketHashName =>
+      buildMarketHashName(baseName: itemName, statTrak: statTrak, wear: wear);
+}

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/accounts_provider.dart';
 import '../../providers/services_providers.dart';
 import '../../services/backup_service.dart';
+import '../../services/home_widget_service.dart';
 import '../../services/shortcuts_service.dart';
 import '../../services/stats_service.dart';
 import '../../theme/app_theme.dart';
@@ -16,10 +17,15 @@ import '../../widgets/update_dialog.dart';
 import '../account/account_detail_screen.dart';
 import '../compare/skin_compare_screen.dart';
 import '../drop/register_drop_dialog.dart';
+import '../ev/ev_calculator_screen.dart';
+import '../ev/tradeup_calculator_screen.dart';
 import '../inventory/inventory_screen.dart';
 import '../settings/settings_screen.dart';
 import '../stats/stats_screen.dart';
 import '../watchlist/watchlist_screen.dart';
+
+/// Opciones del menú "más opciones" del AppBar principal.
+enum _HomeMenuAction { stats, compare, evCalculator, tradeUp, settings }
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -48,6 +54,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
       try {
         await StatsService.recordDailyRankSnapshotsIfNeeded();
+      } catch (_) {}
+
+      try {
+        await StatsService.recordDailyItemPriceSnapshotsIfNeeded();
+      } catch (_) {}
+
+      try {
+        await HomeWidgetService.update();
       } catch (_) {}
 
       try {
@@ -137,24 +151,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.bar_chart, size: 22),
-            tooltip: 'Estadísticas',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const StatsScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.price_check, size: 22),
-            tooltip: 'Comparador de precios',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SkinCompareScreen()),
-              );
-            },
-          ),
-          IconButton(
             icon: const Icon(Icons.inventory_2_outlined, size: 22),
             tooltip: 'Inventario General',
             onPressed: () {
@@ -172,14 +168,83 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined, size: 22),
-            tooltip: 'Ajustes',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              );
+          PopupMenuButton<_HomeMenuAction>(
+            tooltip: 'Más opciones',
+            icon: const Icon(Icons.more_vert, size: 22),
+            onSelected: (action) {
+              switch (action) {
+                case _HomeMenuAction.stats:
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const StatsScreen()),
+                  );
+                  break;
+                case _HomeMenuAction.compare:
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const SkinCompareScreen()),
+                  );
+                  break;
+                case _HomeMenuAction.evCalculator:
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const EvCalculatorScreen()),
+                  );
+                  break;
+                case _HomeMenuAction.tradeUp:
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const TradeUpCalculatorScreen()),
+                  );
+                  break;
+                case _HomeMenuAction.settings:
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                  break;
+              }
             },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: _HomeMenuAction.stats,
+                child: ListTile(
+                  leading: Icon(Icons.bar_chart),
+                  title: Text('Estadísticas'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: _HomeMenuAction.compare,
+                child: ListTile(
+                  leading: Icon(Icons.price_check),
+                  title: Text('Comparador de precios'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: _HomeMenuAction.evCalculator,
+                child: ListTile(
+                  leading: Icon(Icons.calculate_outlined),
+                  title: Text('Calculadora de EV de cajas'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: _HomeMenuAction.tradeUp,
+                child: ListTile(
+                  leading: Icon(Icons.swap_horiz),
+                  title: Text('Calculadora de trade-up'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: _HomeMenuAction.settings,
+                child: ListTile(
+                  leading: Icon(Icons.settings_outlined),
+                  title: Text('Ajustes'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
           ),
         ],
       ),
