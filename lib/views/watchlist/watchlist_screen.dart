@@ -449,9 +449,8 @@ class _AddWatchlistDialogState extends ConsumerState<_AddWatchlistDialog> {
               Autocomplete<String>(
                 optionsBuilder: (TextEditingValue value) {
                   if (value.text.isEmpty) return const Iterable<String>.empty();
-                  final q = value.text.toLowerCase();
                   return SeedItems.forCategory(_category)
-                      .where((s) => s.toLowerCase().contains(q))
+                      .where((s) => itemMatchesQuery(s, _category, value.text))
                       .take(8);
                 },
                 onSelected: (sel) {
@@ -500,7 +499,7 @@ class _AddWatchlistDialogState extends ConsumerState<_AddWatchlistDialog> {
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 12, vertical: 10),
-                                child: Text(option),
+                                child: Text(displayItemName(option, _category)),
                               ),
                             );
                           },

@@ -60,3 +60,15 @@ String displayItemName(String itemName, ItemCategory category) {
   if (category != ItemCategory.caseBox) return itemName;
   return _caseNamesEs[itemName] ?? itemName;
 }
+
+/// True si `query` coincide con el nombre real (inglés, el que se guarda y
+/// se usa para consultar precios) O con su nombre traducido al español (el
+/// que se muestra en pantalla). Así el autocompletado encuentra "Caja
+/// Kilovatio" tanto si escribes "Kilowatt" como si escribes "Kilovatio" o
+/// "Caja".
+bool itemMatchesQuery(String itemName, ItemCategory category, String query) {
+  final q = query.trim().toLowerCase();
+  if (q.isEmpty) return false;
+  if (itemName.toLowerCase().contains(q)) return true;
+  return displayItemName(itemName, category).toLowerCase().contains(q);
+}

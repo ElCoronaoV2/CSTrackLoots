@@ -7,6 +7,7 @@ import '../../models/inventory_item.dart';
 import '../../providers/accounts_provider.dart';
 import '../../providers/inventory_provider.dart';
 import '../../services/hive_service.dart' show SeedItems;
+import '../../utils/es_names.dart';
 import '../../widgets/wear_details_fields.dart';
 
 /// Diálogo para añadir manualmente un item al inventario, sin pasar por el
@@ -95,9 +96,8 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
               Autocomplete<String>(
                 optionsBuilder: (TextEditingValue value) {
                   if (value.text.isEmpty) return const Iterable<String>.empty();
-                  final q = value.text.toLowerCase();
                   return SeedItems.forCategory(_category)
-                      .where((s) => s.toLowerCase().contains(q))
+                      .where((s) => itemMatchesQuery(s, _category, value.text))
                       .take(8);
                 },
                 onSelected: (sel) {
@@ -147,7 +147,7 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 12, vertical: 10),
-                                child: Text(option),
+                                child: Text(displayItemName(option, _category)),
                               ),
                             );
                           },
