@@ -6,6 +6,7 @@ import '../models/cs_account.dart';
 import '../models/inventory_item.dart';
 import '../models/sale_record.dart';
 import '../services/hive_service.dart';
+import '../services/home_widget_service.dart';
 import '../services/steam_market_service.dart';
 import '../utils/es_names.dart';
 import '../utils/market_hash_name.dart';
@@ -56,6 +57,8 @@ class InventoryNotifier extends StateNotifier<List<InventoryItem>> {
     final list = HiveService.inventoryBox.values.toList()
       ..sort((a, b) => b.obtainedAt.compareTo(a.obtainedAt));
     state = list;
+    // ignore: unawaited_futures
+    HomeWidgetService.update();
   }
 
   @override

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/accounts_provider.dart';
 import '../../providers/services_providers.dart';
 import '../../services/backup_service.dart';
+import '../../services/home_widget_service.dart';
 import '../../services/shortcuts_service.dart';
 import '../../services/stats_service.dart';
 import '../../theme/app_theme.dart';
@@ -57,6 +58,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
       try {
         await StatsService.recordDailyItemPriceSnapshotsIfNeeded();
+      } catch (_) {}
+
+      try {
+        await HomeWidgetService.update();
       } catch (_) {}
 
       try {
