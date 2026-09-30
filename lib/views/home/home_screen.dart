@@ -16,13 +16,14 @@ import '../../widgets/update_dialog.dart';
 import '../account/account_detail_screen.dart';
 import '../compare/skin_compare_screen.dart';
 import '../drop/register_drop_dialog.dart';
+import '../ev/ev_calculator_screen.dart';
 import '../inventory/inventory_screen.dart';
 import '../settings/settings_screen.dart';
 import '../stats/stats_screen.dart';
 import '../watchlist/watchlist_screen.dart';
 
 /// Opciones del menú "más opciones" del AppBar principal.
-enum _HomeMenuAction { stats, compare, settings }
+enum _HomeMenuAction { stats, compare, evCalculator, settings }
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -177,6 +178,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         builder: (_) => const SkinCompareScreen()),
                   );
                   break;
+                case _HomeMenuAction.evCalculator:
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const EvCalculatorScreen()),
+                  );
+                  break;
                 case _HomeMenuAction.settings:
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const SettingsScreen()),
@@ -198,6 +205,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: ListTile(
                   leading: Icon(Icons.price_check),
                   title: Text('Comparador de precios'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: _HomeMenuAction.evCalculator,
+                child: ListTile(
+                  leading: Icon(Icons.calculate_outlined),
+                  title: Text('Calculadora de EV de cajas'),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
