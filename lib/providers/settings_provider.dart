@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/app_settings.dart';
+import '../services/app_lock_service.dart';
 import '../services/hive_service.dart';
 
 /// Estado de los ajustes expuesto a la UI.
@@ -32,6 +33,25 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       _update((s) => s.copyWith(steamApiKey: apiKey));
 
   Future<void> clearSteamApiKey() => _update((s) => s.clearSteamApiKey());
+
+  /// Configura un PIN nuevo (lo hashea, nunca se guarda en claro) y activa
+  /// el bloqueo de la app.
+  Future<void> setPin(String pin) => _update(
+        (s) => s.copyWith(
+          pinHash: AppLockService().hashPin(pin),
+          appLockEnabled: true,
+        ),
+      );
+
+  /// Quita el PIN configurado y desactiva el bloqueo (y la huella, que
+  /// necesita un PIN de respaldo).
+  Future<void> clearPin() => _update((s) => s.clearPin());
+
+  Future<void> setAppLockEnabled(bool enabled) =>
+      _update((s) => s.copyWith(appLockEnabled: enabled));
+
+  Future<void> setBiometricEnabled(bool enabled) =>
+      _update((s) => s.copyWith(biometricEnabled: enabled));
 }
 
 final settingsProvider = StateNotifierProvider<SettingsNotifier, AppSettings>(

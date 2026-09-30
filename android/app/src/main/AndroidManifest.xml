@@ -13,6 +13,9 @@
     <!-- Permite abrir el instalador del sistema con el APK de actualización descargado. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
 
+    <!-- Bloqueo de la app con huella/Face ID (local_auth). -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+
     <application
         android:label="CS2 Tracker"
         android:name="${applicationName}"

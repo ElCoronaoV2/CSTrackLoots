@@ -27,7 +27,8 @@ android {
 
     defaultConfig {
         applicationId = "com.cs2tracker.cs2_tracker"
-        minSdk = flutter.minSdkVersion
+        // local_auth (bloqueo con huella/Face ID) requiere API 23 como mínimo.
+        minSdk = maxOf(flutter.minSdkVersion, 23)
         targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName

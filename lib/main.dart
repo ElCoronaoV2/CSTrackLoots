@@ -9,6 +9,7 @@ import 'providers/services_providers.dart';
 import 'services/hive_service.dart';
 import 'theme/app_theme.dart';
 import 'views/home/home_screen.dart';
+import 'views/lock/app_lock_screen.dart';
 
 /// Wrapper top-level para que flutter_local_notifications pueda invocarlo
 /// desde el isolate de background al tocar una notificación (entry-point).
@@ -64,7 +65,27 @@ class _Cs2TrackerAppState extends ConsumerState<Cs2TrackerApp> {
       theme: AppTheme.dark(),
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.dark,
-      home: const HomeScreen(),
+      home: const _AppLockGate(),
     );
+  }
+}
+
+/// Muestra la pantalla de bloqueo (PIN/huella) antes de nada si el usuario
+/// la activó en Ajustes; si no, va directo al inicio. Una vez desbloqueada
+/// en esta sesión, no vuelve a pedirla hasta reabrir la app.
+class _AppLockGate extends ConsumerStatefulWidget {
+  const _AppLockGate();
+
+  @override
+  ConsumerState<_AppLockGate> createState() => _AppLockGateState();
+}
+
+class _AppLockGateState extends ConsumerState<_AppLockGate> {
+  late bool _unlocked = !HiveService.settings.appLockEnabled;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_unlocked) return const HomeScreen();
+    return AppLockScreen(onUnlocked: () => setState(() => _unlocked = true));
   }
 }

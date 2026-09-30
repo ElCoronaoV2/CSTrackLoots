@@ -36,6 +36,20 @@ class AppSettings extends HiveObject {
   @HiveField(7)
   String? steamApiKey;
 
+  /// True si la app pide PIN/huella al abrirla.
+  @HiveField(8)
+  bool appLockEnabled;
+
+  /// Hash (nunca el PIN en claro) del PIN de desbloqueo. Null = no hay PIN
+  /// configurado todavía.
+  @HiveField(9)
+  String? pinHash;
+
+  /// True si, además del PIN, se acepta huella/Face ID (si el dispositivo
+  /// lo soporta) como alternativa más rápida.
+  @HiveField(10)
+  bool biometricEnabled;
+
   AppSettings({
     this.preferredCurrency = 'EUR',
     this.notificationsEnabled = true,
@@ -45,6 +59,9 @@ class AppSettings extends HiveObject {
     this.autoBackupIntervalDays = 7,
     this.lastAutoBackupEpochMs = 0,
     this.steamApiKey,
+    this.appLockEnabled = false,
+    this.pinHash,
+    this.biometricEnabled = false,
   });
 
   /// Copia el estado cambiando solo los campos indicados. Para borrar
@@ -59,6 +76,9 @@ class AppSettings extends HiveObject {
     int? autoBackupIntervalDays,
     int? lastAutoBackupEpochMs,
     String? steamApiKey,
+    bool? appLockEnabled,
+    String? pinHash,
+    bool? biometricEnabled,
   }) {
     return AppSettings(
       preferredCurrency: preferredCurrency ?? this.preferredCurrency,
@@ -73,6 +93,9 @@ class AppSettings extends HiveObject {
       lastAutoBackupEpochMs:
           lastAutoBackupEpochMs ?? this.lastAutoBackupEpochMs,
       steamApiKey: steamApiKey ?? this.steamApiKey,
+      appLockEnabled: appLockEnabled ?? this.appLockEnabled,
+      pinHash: pinHash ?? this.pinHash,
+      biometricEnabled: biometricEnabled ?? this.biometricEnabled,
     );
   }
 
@@ -87,6 +110,28 @@ class AppSettings extends HiveObject {
       autoBackupEnabled: autoBackupEnabled,
       autoBackupIntervalDays: autoBackupIntervalDays,
       lastAutoBackupEpochMs: lastAutoBackupEpochMs,
+      appLockEnabled: appLockEnabled,
+      pinHash: pinHash,
+      biometricEnabled: biometricEnabled,
+    );
+  }
+
+  /// Copia el estado quitando el PIN configurado (a diferencia de
+  /// [copyWith], aquí sí se puede poner a null explícitamente). También
+  /// desactiva el bloqueo, porque sin PIN la huella sola no basta (Android
+  /// exige un PIN/patrón de respaldo).
+  AppSettings clearPin() {
+    return AppSettings(
+      preferredCurrency: preferredCurrency,
+      notificationsEnabled: notificationsEnabled,
+      remind24hBeforeReset: remind24hBeforeReset,
+      lastProcessedResetEpochMs: lastProcessedResetEpochMs,
+      autoBackupEnabled: autoBackupEnabled,
+      autoBackupIntervalDays: autoBackupIntervalDays,
+      lastAutoBackupEpochMs: lastAutoBackupEpochMs,
+      steamApiKey: steamApiKey,
+      appLockEnabled: false,
+      biometricEnabled: false,
     );
   }
 }

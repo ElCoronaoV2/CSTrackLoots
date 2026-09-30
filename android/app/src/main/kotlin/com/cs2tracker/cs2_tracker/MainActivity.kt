@@ -1,7 +1,7 @@
 package com.cs2tracker.cs2_tracker
 
 import android.content.Intent
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
@@ -9,8 +9,12 @@ import io.flutter.plugin.common.MethodChannel
  * Además de arrancar Flutter, expone un MethodChannel para que la app pueda
  * saber si se abrió desde uno de los accesos directos del icono (long-press
  * en el launcher) y a qué pantalla debe navegar.
+ *
+ * Extiende FlutterFragmentActivity (no FlutterActivity) porque el plugin
+ * local_auth necesita una FragmentActivity para mostrar el diálogo nativo
+ * de huella/Face ID.
  */
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     private val channelName = "cs2tracker/shortcuts"
     private var methodChannel: MethodChannel? = null
 
